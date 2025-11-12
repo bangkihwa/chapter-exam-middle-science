@@ -71,8 +71,8 @@ export default function AdminPage() {
   const syncStudentsMutation = useMutation({
     mutationFn: async () => {
       return await apiRequest<{ message: string; added: number; skipped: number; total: number }>(
-        "/api/sync-students",
         "POST",
+        "/api/sync-students",
         {}
       );
     },
