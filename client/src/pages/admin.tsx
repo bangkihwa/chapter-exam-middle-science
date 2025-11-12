@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ShieldCheck, Users, BarChart3, AlertCircle, TrendingDown, LogOut, Search, Calendar } from "lucide-react";
+import { ShieldCheck, Users, BarChart3, AlertCircle, TrendingDown, LogOut, Search, Calendar, RefreshCw } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import type { Student, TestResult } from "@shared/schema";
 import { units } from "@shared/schema";
 import { StudentReportView } from "@/components/student-report-view";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface SheetResult {
   studentId: string;
@@ -44,6 +46,7 @@ export default function AdminPage() {
   const [selectedUnit, setSelectedUnit] = useState(units[0]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     const isAdmin = sessionStorage.getItem("admin");
@@ -65,9 +68,38 @@ export default function AdminPage() {
     enabled: !!selectedUnit,
   });
 
+  const syncStudentsMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest<{ message: string; added: number; skipped: number; total: number }>(
+        "/api/sync-students",
+        "POST",
+        {}
+      );
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/students"] });
+      toast({
+        title: "동기화 완료",
+        description: data.message,
+        variant: "default",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "동기화 실패",
+        description: error.message || "학생 정보를 동기화하는 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleLogout = () => {
     sessionStorage.removeItem("admin");
     setLocation("/admin/login");
+  };
+
+  const handleSyncStudents = () => {
+    syncStudentsMutation.mutate();
   };
 
   if (resultsLoading || studentsLoading) {
@@ -131,14 +163,25 @@ export default function AdminPage() {
               <ShieldCheck className="w-8 h-8 text-primary" />
               <h1 className="text-2xl font-bold">관리자 대시보드</h1>
             </div>
-            <Button
-              variant="outline"
-              onClick={handleLogout}
-              data-testid="button-logout"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              로그아웃
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="default"
+                onClick={handleSyncStudents}
+                disabled={syncStudentsMutation.isPending}
+                data-testid="button-sync-students"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${syncStudentsMutation.isPending ? 'animate-spin' : ''}`} />
+                {syncStudentsMutation.isPending ? "동기화 중..." : "학생 동기화"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleLogout}
+                data-testid="button-logout"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                로그아웃
+              </Button>
+            </div>
           </div>
         </div>
       </header>
