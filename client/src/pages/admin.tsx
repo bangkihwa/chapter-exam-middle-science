@@ -347,7 +347,7 @@ export default function AdminPage() {
                 <CardHeader>
                   <CardTitle>단원 선택</CardTitle>
                   <CardDescription>
-                    분석할 단원을 선택하세요 (데이터베이스 기반)
+                    분석할 단원을 선택하세요 (구글 시트 데이터 기반)
                   </CardDescription>
                 </CardHeader>
                 <CardContent>

@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, TrendingDown, Award, Calendar, Target, Sparkles, BookOpen, Brain, Zap, Star, Trophy } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { TrendingUp, TrendingDown, Award, Calendar, Target, Sparkles, BookOpen, Brain, Zap, Star, Trophy, Eye, CheckCircle, XCircle } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Cell, PieChart, Pie } from "recharts";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { useQuery } from "@tanstack/react-query";
 import type { TestResult } from "@shared/schema";
 
 interface StudentReportViewProps {
@@ -17,9 +20,174 @@ interface StudentReportViewProps {
 }
 
 export function StudentReportView({ results, studentName, studentId, showBackButton = false, onBack }: StudentReportViewProps) {
+  const [selectedResult, setSelectedResult] = useState<TestResult | null>(null);
+
   const sortedResults = [...results].sort(
     (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
   );
+
+  // 선택된 시험 결과의 문제 데이터 가져오기
+  const { data: questions } = useQuery<any[]>({
+    queryKey: ['/api/questions/unit', selectedResult?.unit],
+    enabled: !!selectedResult,
+  });
+
+  const getGradeInfo = (score: number) => {
+    if (score >= 95) return { grade: "S", color: "bg-purple-600", message: "완벽합니다!" };
+    if (score >= 90) return { grade: "A+", color: "bg-green-600", message: "매우 우수합니다!" };
+    if (score >= 85) return { grade: "A", color: "bg-green-500", message: "우수합니다!" };
+    if (score >= 80) return { grade: "B+", color: "bg-blue-600", message: "잘했습니다!" };
+    if (score >= 75) return { grade: "B", color: "bg-blue-500", message: "좋습니다!" };
+    if (score >= 70) return { grade: "C", color: "bg-yellow-600", message: "조금 더 노력하세요!" };
+    return { grade: "D", color: "bg-red-600", message: "더 공부가 필요합니다!" };
+  };
+
+  const renderResultDetail = () => {
+    if (!selectedResult || !questions) return null;
+
+    const studentAnswers = JSON.parse(selectedResult.answers || "[]");
+    const gradeInfo = getGradeInfo(selectedResult.achievementRate);
+
+    // 오답 문제 필터링
+    const wrongAnswers = studentAnswers.filter((ans: any) => {
+      const question = questions.find(q => q.questionId === ans.questionId);
+      return question && question.answer !== ans.answer;
+    });
+
+    return (
+      <Dialog open={!!selectedResult} onOpenChange={() => setSelectedResult(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl flex items-center gap-3">
+              <Brain className="w-8 h-8 text-primary" />
+              시험 결과 상세
+            </DialogTitle>
+            <DialogDescription>
+              {selectedResult.unit} · {new Date(selectedResult.submittedAt).toLocaleString("ko-KR")}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* 점수 및 등급 */}
+            <div className="text-center p-8 bg-gradient-to-br from-primary/10 to-accent/10 rounded-2xl">
+              <div className={`inline-block px-12 py-6 rounded-2xl text-white ${gradeInfo.color} shadow-xl mb-4`}>
+                <div className="text-6xl font-bold mb-2">{selectedResult.achievementRate}점</div>
+                <div className="text-4xl font-black tracking-wider">{gradeInfo.grade}</div>
+              </div>
+              <p className="text-xl font-semibold mt-4">{gradeInfo.message}</p>
+              <div className="grid grid-cols-2 gap-4 mt-6 max-w-md mx-auto">
+                <div className="p-4 bg-card rounded-xl border">
+                  <p className="text-sm text-muted-foreground mb-1">정답</p>
+                  <p className="text-3xl font-bold text-green-600">{selectedResult.correctAnswers}</p>
+                </div>
+                <div className="p-4 bg-card rounded-xl border">
+                  <p className="text-sm text-muted-foreground mb-1">오답</p>
+                  <p className="text-3xl font-bold text-red-600">{wrongAnswers.length}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 피드백 */}
+            {selectedResult.feedback && (
+              <Card className="border-2 border-primary/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-primary" />
+                    선생님 피드백
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-lg">{selectedResult.feedback}</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* 오답 문제 */}
+            {wrongAnswers.length > 0 && (
+              <Card className="border-2 border-red-500/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <XCircle className="w-5 h-5 text-red-600" />
+                    틀린 문제 ({wrongAnswers.length}개)
+                  </CardTitle>
+                  <CardDescription>
+                    다시 한 번 확인하고 복습하세요
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {wrongAnswers.map((ans: any, idx: number) => {
+                      const question = questions.find(q => q.questionId === ans.questionId);
+                      if (!question) return null;
+
+                      return (
+                        <div key={idx} className="p-4 rounded-xl bg-red-500/5 border-2 border-red-500/20">
+                          <div className="flex items-start justify-between mb-3">
+                            <h4 className="text-lg font-bold">문제 {question.questionId}번</h4>
+                            <Badge variant="outline" className="border-red-600 text-red-700">
+                              오답
+                            </Badge>
+                          </div>
+                          <div className="grid md:grid-cols-2 gap-4 mt-3">
+                            <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/30">
+                              <p className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
+                                <CheckCircle className="w-4 h-4 text-green-600" />
+                                정답
+                              </p>
+                              <p className="text-2xl font-bold text-green-700">{question.answer}번</p>
+                            </div>
+                            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+                              <p className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
+                                <XCircle className="w-4 h-4 text-red-600" />
+                                내 답
+                              </p>
+                              <p className="text-2xl font-bold text-red-700">{ans.answer}번</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* 정답 문제 */}
+            {selectedResult.correctAnswers > 0 && (
+              <Card className="border-2 border-green-500/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                    맞힌 문제 ({selectedResult.correctAnswers}개)
+                  </CardTitle>
+                  <CardDescription>
+                    잘했습니다! 이 실력을 유지하세요
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                    {studentAnswers
+                      .filter((ans: any) => {
+                        const question = questions.find(q => q.questionId === ans.questionId);
+                        return question && question.answer === ans.answer;
+                      })
+                      .map((ans: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="aspect-square flex items-center justify-center bg-green-500/10 border-2 border-green-500/30 rounded-lg font-bold text-green-700"
+                        >
+                          {ans.questionId}
+                        </div>
+                      ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  };
 
   const totalTests = sortedResults.length;
   const averageScore = totalTests > 0
@@ -437,8 +605,8 @@ export function StudentReportView({ results, studentName, studentId, showBackBut
                           {unit.results
                             .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
                             .map((result, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-card border">
-                              <div>
+                            <div key={idx} className="flex items-center justify-between p-4 rounded-lg bg-card border hover-elevate cursor-pointer" onClick={() => setSelectedResult(result)}>
+                              <div className="flex-1">
                                 <Calendar className="w-4 h-4 inline mr-2 text-muted-foreground" />
                                 <span className="text-sm">
                                   {new Date(result.submittedAt).toLocaleString("ko-KR", {
@@ -462,6 +630,18 @@ export function StudentReportView({ results, studentName, studentId, showBackBut
                                 }`}>
                                   {result.achievementRate}%
                                 </Badge>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedResult(result);
+                                  }}
+                                  data-testid={`button-view-detail-${idx}`}
+                                >
+                                  <Eye className="w-4 h-4 mr-1" />
+                                  상세 보기
+                                </Button>
                               </div>
                             </div>
                           ))}
@@ -474,6 +654,9 @@ export function StudentReportView({ results, studentName, studentId, showBackBut
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* 시험 결과 상세 모달 */}
+      {renderResultDetail()}
     </div>
   );
 }

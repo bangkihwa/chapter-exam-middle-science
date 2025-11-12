@@ -91,7 +91,10 @@ export async function writeResultToSheet(spreadsheetId: string, result: any) {
       },
     });
 
-    // 2. 문항응답 탭에 각 문제별 답안 저장
+    // 2. 문항응답 탭 확인 및 생성
+    await ensureSheetExists(spreadsheetId, '문항응답');
+
+    // 3. 문항응답 탭에 각 문제별 답안 저장
     const studentAnswers = JSON.parse(result.answers);
     const questionRows = studentAnswers.map((ans: any) => [
       `${result.studentId}_${timestamp}`, // submissionId
@@ -106,7 +109,7 @@ export async function writeResultToSheet(spreadsheetId: string, result: any) {
     if (questionRows.length > 0) {
       await sheets.spreadsheets.values.append({
         spreadsheetId,
-        range: '문항응답!A:G', // submissionId, 학생ID, 학생이름, 단원, 문제번호, 학생답안, 응시일시
+        range: "'문항응답'!A:G", // submissionId, 학생ID, 학생이름, 단원, 문제번호, 학생답안, 응시일시
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: questionRows,
@@ -145,12 +148,60 @@ export async function readResultsFromSheet(spreadsheetId: string) {
   }
 }
 
+async function ensureSheetExists(spreadsheetId: string, sheetName: string) {
+  try {
+    const sheets = await getUncachableGoogleSheetClient();
+    
+    // 시트 목록 가져오기
+    const metadata = await sheets.spreadsheets.get({
+      spreadsheetId,
+    });
+
+    const sheetExists = metadata.data.sheets?.some(
+      sheet => sheet.properties?.title === sheetName
+    );
+
+    // 시트가 없으면 생성
+    if (!sheetExists) {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [{
+            addSheet: {
+              properties: {
+                title: sheetName,
+              },
+            },
+          }],
+        },
+      });
+
+      // 헤더 추가
+      if (sheetName === '문항응답') {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range: `'${sheetName}'!A1:G1`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: {
+            values: [['응시ID', '학생ID', '학생이름', '단원', '문제번호', '학생답안', '응시일시']],
+          },
+        });
+      }
+    }
+  } catch (error) {
+    console.error(`Error ensuring sheet ${sheetName} exists:`, error);
+  }
+}
+
 export async function readQuestionResponsesFromSheet(spreadsheetId: string, unit?: string) {
   try {
+    // 시트가 없으면 생성
+    await ensureSheetExists(spreadsheetId, '문항응답');
+    
     const sheets = await getUncachableGoogleSheetClient();
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: '문항응답!A2:G', // submissionId, 학생ID, 학생이름, 단원, 문제번호, 학생답안, 응시일시
+      range: "'문항응답'!A2:G", // submissionId, 학생ID, 학생이름, 단원, 문제번호, 학생답안, 응시일시
     });
 
     const rows = response.data.values || [];
