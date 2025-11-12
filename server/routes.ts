@@ -133,7 +133,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Try to write to Google Sheets (optional, doesn't fail if unsuccessful)
-      const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
+      const dbSetting = await storage.getSetting("GOOGLE_SPREADSHEET_ID");
+      const spreadsheetId = dbSetting?.value || process.env.GOOGLE_SPREADSHEET_ID;
       let sheetWriteSuccess = false;
       let sheetError = null;
       
@@ -184,10 +185,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Sync students from Google Sheets
   app.post("/api/sync-students", async (req, res) => {
     try {
-      const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
+      const dbSetting = await storage.getSetting("GOOGLE_SPREADSHEET_ID");
+      const spreadsheetId = dbSetting?.value || process.env.GOOGLE_SPREADSHEET_ID;
+      
       if (!spreadsheetId) {
         return res.status(400).json({
-          message: "GOOGLE_SPREADSHEET_ID가 설정되지 않았습니다.",
+          message: "GOOGLE_SPREADSHEET_ID가 설정되지 않았습니다. 관리자 페이지에서 구글 시트 ID를 설정해주세요.",
         });
       }
 
@@ -327,7 +330,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all test results from Google Sheets (admin only)
   app.get("/api/admin/all-results", async (req, res) => {
     try {
-      const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
+      const dbSetting = await storage.getSetting("GOOGLE_SPREADSHEET_ID");
+      const spreadsheetId = dbSetting?.value || process.env.GOOGLE_SPREADSHEET_ID;
       if (!spreadsheetId) {
         return res.status(400).json({
           message: "GOOGLE_SPREADSHEET_ID가 설정되지 않았습니다.",
@@ -349,7 +353,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { unit } = req.params;
       const decodedUnit = decodeURIComponent(unit);
       
-      const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
+      const dbSetting = await storage.getSetting("GOOGLE_SPREADSHEET_ID");
+      const spreadsheetId = dbSetting?.value || process.env.GOOGLE_SPREADSHEET_ID;
       if (!spreadsheetId) {
         return res.status(400).json({
           message: "GOOGLE_SPREADSHEET_ID가 설정되지 않았습니다.",
@@ -406,6 +411,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       return res.status(500).json({
         message: error.message || "학생 데이터를 불러오는 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
+  // Get Google Sheets ID setting (admin only)
+  app.get("/api/admin/settings/spreadsheet-id", async (req, res) => {
+    try {
+      const setting = await storage.getSetting("GOOGLE_SPREADSHEET_ID");
+      const envSpreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
+      
+      return res.json({
+        value: setting?.value || envSpreadsheetId || "",
+        source: setting?.value ? "database" : (envSpreadsheetId ? "environment" : "none"),
+      });
+    } catch (error: any) {
+      return res.status(500).json({
+        message: error.message || "설정을 불러오는 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
+  // Set Google Sheets ID setting (admin only)
+  app.post("/api/admin/settings/spreadsheet-id", async (req, res) => {
+    try {
+      const { value } = req.body;
+      
+      if (!value || typeof value !== "string") {
+        return res.status(400).json({
+          message: "유효한 구글 시트 ID를 입력해주세요.",
+        });
+      }
+
+      await storage.setSetting("GOOGLE_SPREADSHEET_ID", value.trim());
+      
+      return res.json({
+        success: true,
+        message: "구글 시트 ID가 저장되었습니다.",
+      });
+    } catch (error: any) {
+      return res.status(500).json({
+        message: error.message || "설정을 저장하는 중 오류가 발생했습니다.",
       });
     }
   });

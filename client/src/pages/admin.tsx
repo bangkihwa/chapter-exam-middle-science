@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ShieldCheck, Users, BarChart3, AlertCircle, TrendingDown, LogOut, Search, Calendar, RefreshCw } from "lucide-react";
+import { ShieldCheck, Users, BarChart3, AlertCircle, TrendingDown, LogOut, Search, Calendar, RefreshCw, Settings2, Link as LinkIcon } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import type { Student, TestResult } from "@shared/schema";
 import { units } from "@shared/schema";
@@ -46,6 +46,7 @@ export default function AdminPage() {
   const [selectedUnit, setSelectedUnit] = useState(units[0]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [spreadsheetIdInput, setSpreadsheetIdInput] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -66,6 +67,41 @@ export default function AdminPage() {
   const { data: unitStats, isLoading: statsLoading } = useQuery<UnitStats>({
     queryKey: ["/api/admin/unit-stats", selectedUnit],
     enabled: !!selectedUnit,
+  });
+
+  const { data: spreadsheetSettings } = useQuery<{ value: string; source: string }>({
+    queryKey: ["/api/admin/settings/spreadsheet-id"],
+  });
+
+  useEffect(() => {
+    if (spreadsheetSettings?.value && !spreadsheetIdInput) {
+      setSpreadsheetIdInput(spreadsheetSettings.value);
+    }
+  }, [spreadsheetSettings]);
+
+  const saveSpreadsheetIdMutation = useMutation({
+    mutationFn: async (value: string) => {
+      return await apiRequest<{ success: boolean; message: string }>(
+        "POST",
+        "/api/admin/settings/spreadsheet-id",
+        { value }
+      );
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/spreadsheet-id"] });
+      toast({
+        title: "저장 완료",
+        description: data.message,
+        variant: "default",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "저장 실패",
+        description: error.message || "설정을 저장하는 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    },
   });
 
   const syncStudentsMutation = useMutation({
@@ -100,6 +136,18 @@ export default function AdminPage() {
 
   const handleSyncStudents = () => {
     syncStudentsMutation.mutate();
+  };
+
+  const handleSaveSpreadsheetId = () => {
+    if (!spreadsheetIdInput.trim()) {
+      toast({
+        title: "입력 오류",
+        description: "구글 시트 ID를 입력해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
+    saveSpreadsheetIdMutation.mutate(spreadsheetIdInput.trim());
   };
 
   if (resultsLoading || studentsLoading) {
@@ -226,9 +274,10 @@ export default function AdminPage() {
 
           {/* 탭 메뉴 */}
           <Tabs defaultValue="students" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="students">학생 검색 및 성적</TabsTrigger>
               <TabsTrigger value="questions">단원별 오답 분석</TabsTrigger>
+              <TabsTrigger value="settings">시스템 설정</TabsTrigger>
             </TabsList>
 
             {/* 학생 검색 및 성적 */}
@@ -508,6 +557,73 @@ export default function AdminPage() {
                   </CardContent>
                 </Card>
               )}
+            </TabsContent>
+
+            {/* 시스템 설정 */}
+            <TabsContent value="settings" className="space-y-4">
+              <Card className="shadow-lg border-2 border-primary/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Settings2 className="w-6 h-6" />
+                    구글 시트 연동 설정
+                  </CardTitle>
+                  <CardDescription>
+                    학생 정보와 시험 결과를 동기화할 구글 시트 ID를 설정하세요
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <label htmlFor="spreadsheet-id" className="text-sm font-medium">
+                      구글 시트 ID
+                    </label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="spreadsheet-id"
+                        placeholder="예: 1Abc2Def3Ghi4Jkl5Mno6Pqr7Stu8Vwx9Yz0"
+                        value={spreadsheetIdInput}
+                        onChange={(e) => setSpreadsheetIdInput(e.target.value)}
+                        data-testid="input-spreadsheet-id"
+                        className="flex-1 font-mono text-sm"
+                      />
+                      <Button
+                        onClick={handleSaveSpreadsheetId}
+                        disabled={saveSpreadsheetIdMutation.isPending}
+                        data-testid="button-save-spreadsheet-id"
+                      >
+                        {saveSpreadsheetIdMutation.isPending ? "저장 중..." : "저장"}
+                      </Button>
+                    </div>
+                    {spreadsheetSettings?.source && (
+                      <p className="text-sm text-muted-foreground">
+                        <LinkIcon className="w-3 h-3 inline mr-1" />
+                        현재 설정 위치: {
+                          spreadsheetSettings.source === "database" ? "데이터베이스 (이 화면에서 설정됨)" :
+                          spreadsheetSettings.source === "environment" ? "환경 변수 (개발 환경)" :
+                          "설정되지 않음"
+                        }
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="pt-4 border-t space-y-2">
+                    <h4 className="font-semibold">📖 구글 시트 ID 찾는 방법:</h4>
+                    <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
+                      <li>구글 시트를 엽니다</li>
+                      <li>URL에서 /d/ 와 /edit 사이의 문자열을 복사합니다</li>
+                      <li>예: https://docs.google.com/spreadsheets/d/<strong className="text-foreground">여기가_ID</strong>/edit</li>
+                    </ol>
+                  </div>
+
+                  <div className="pt-4 border-t space-y-2">
+                    <h4 className="font-semibold">✅ 설정 완료 후:</h4>
+                    <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
+                      <li>상단의 <strong className="text-foreground">"학생 동기화"</strong> 버튼을 클릭하세요</li>
+                      <li>구글 시트의 학생 정보가 데이터베이스로 복사됩니다</li>
+                      <li>학생들이 로그인할 수 있습니다!</li>
+                    </ol>
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
         </div>

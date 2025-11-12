@@ -1,4 +1,4 @@
-import { students, questions, testResults, type Student, type InsertStudent, type Question, type InsertQuestion, type TestResult, type InsertTestResult } from "@shared/schema";
+import { students, questions, testResults, settings, type Student, type InsertStudent, type Question, type InsertQuestion, type TestResult, type InsertTestResult, type Setting, type InsertSetting } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
 
@@ -20,6 +20,11 @@ export interface IStorage {
   getTestResultsByStudent(studentId: string): Promise<TestResult[]>;
   getTestResultsByUnit(unit: string): Promise<TestResult[]>;
   getAllTestResults(): Promise<TestResult[]>;
+  
+  // Settings operations
+  getSetting(key: string): Promise<Setting | undefined>;
+  setSetting(key: string, value: string): Promise<Setting>;
+  getAllSettings(): Promise<Setting[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -108,6 +113,38 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(testResults)
       .orderBy(desc(testResults.submittedAt));
+  }
+
+  // Settings operations
+  async getSetting(key: string): Promise<Setting | undefined> {
+    const [setting] = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, key));
+    return setting || undefined;
+  }
+
+  async setSetting(key: string, value: string): Promise<Setting> {
+    const existing = await this.getSetting(key);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(settings)
+        .set({ value, updatedAt: new Date() })
+        .where(eq(settings.key, key))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(settings)
+        .values({ key, value })
+        .returning();
+      return created;
+    }
+  }
+
+  async getAllSettings(): Promise<Setting[]> {
+    return await db.select().from(settings);
   }
 }
 
