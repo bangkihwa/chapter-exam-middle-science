@@ -168,10 +168,10 @@ export default function TestPage() {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        <div className="max-w-6xl mx-auto grid lg:grid-cols-[300px_1fr] gap-6">
-          <Card className="h-fit sticky top-24">
-            <CardContent className="p-4 space-y-4">
-              <h3 className="font-semibold text-sm">문제 번호</h3>
+        <div className="max-w-6xl mx-auto space-y-6">
+          <Card className="lg:hidden">
+            <CardContent className="p-4">
+              <h3 className="font-semibold text-sm mb-3">문제 번호</h3>
               <div className="grid grid-cols-5 gap-2">
                 {multipleChoiceQuestions.map((q, index) => {
                   const isAnswered = !!answers[q.questionId];
@@ -186,7 +186,7 @@ export default function TestPage() {
                       onClick={() => handleQuestionNavigation(index)}
                       data-testid={`button-nav-${index}`}
                     >
-                      {q.questionId}
+                      {index + 1}
                     </Button>
                   );
                 })}
@@ -194,7 +194,33 @@ export default function TestPage() {
             </CardContent>
           </Card>
 
-          <div className="space-y-6">
+          <div className="grid lg:grid-cols-[300px_1fr] gap-6">
+            <Card className="hidden lg:block h-fit sticky top-24">
+              <CardContent className="p-4 space-y-4">
+                <h3 className="font-semibold text-sm">문제 번호</h3>
+                <div className="grid grid-cols-5 gap-2">
+                  {multipleChoiceQuestions.map((q, index) => {
+                    const isAnswered = !!answers[q.questionId];
+                    const isCurrent = index === currentQuestionIndex;
+                    
+                    return (
+                      <Button
+                        key={q.questionId}
+                        variant={isCurrent ? "default" : isAnswered ? "secondary" : "outline"}
+                        size="sm"
+                        className="h-10 font-mono"
+                        onClick={() => handleQuestionNavigation(index)}
+                        data-testid={`button-nav-${index}`}
+                      >
+                        {index + 1}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="space-y-6">
             <Card>
               <CardContent className="p-8 space-y-8">
                 <div className="flex items-start justify-between gap-4">
@@ -272,6 +298,7 @@ export default function TestPage() {
               )}
             </div>
           </div>
+        </div>
         </div>
       </main>
     </div>
