@@ -196,6 +196,9 @@ export default function AdminPage() {
                     <Search className="w-6 h-6" />
                     학생 검색
                   </CardTitle>
+                  <CardDescription>
+                    학생 이름 또는 ID를 검색하여 성적을 확인하세요
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Input
@@ -211,19 +214,19 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
 
-              {/* 검색 결과 또는 학생 목록 */}
-              {!selectedStudent && (
+              {/* 검색 결과 (검색어가 있을 때만 표시) */}
+              {!selectedStudent && searchQuery && (
                 <Card className="shadow-lg">
                   <CardHeader>
                     <CardTitle>
-                      {searchQuery ? `검색 결과 (${studentStats.length}명)` : `전체 학생 (${studentStats.length}명)`}
+                      검색 결과 ({studentStats.length}명)
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
                       {studentStats.length === 0 ? (
                         <p className="text-center text-muted-foreground py-8">
-                          {searchQuery ? "검색 결과가 없습니다" : "등록된 학생이 없습니다"}
+                          검색 결과가 없습니다
                         </p>
                       ) : (
                         studentStats.map((student, index) => {
@@ -273,6 +276,20 @@ export default function AdminPage() {
                         })
                       )}
                     </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* 검색 안내 메시지 (검색어가 없고 학생도 선택하지 않았을 때) */}
+              {!selectedStudent && !searchQuery && (
+                <Card className="shadow-lg">
+                  <CardContent className="py-16 text-center">
+                    <Search className="w-20 h-20 mx-auto mb-6 text-muted-foreground opacity-30" />
+                    <h3 className="text-2xl font-bold mb-3">학생을 검색하세요</h3>
+                    <p className="text-muted-foreground text-lg">
+                      위의 검색창에 학생 이름 또는 ID를 입력하여<br />
+                      개별 학생의 성적을 확인할 수 있습니다
+                    </p>
                   </CardContent>
                 </Card>
               )}

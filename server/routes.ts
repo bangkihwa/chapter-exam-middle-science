@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { loginSchema, submitTestSchema, TEXTBOOK_NAME, units } from "@shared/schema";
-import { writeResultToSheet, readStudentsFromSheet, readResultsFromSheet } from "./googleSheets";
+import { writeResultToSheet, readStudentsFromSheet, readResultsFromSheet, readQuestionResponsesFromSheet } from "./googleSheets";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Login endpoint
@@ -326,19 +326,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get unit statistics with wrong answer analysis (admin only)
+  // Get unit statistics with wrong answer analysis from Google Sheets (admin only)
   app.get("/api/admin/unit-stats/:unit", async (req, res) => {
     try {
       const { unit } = req.params;
       const decodedUnit = decodeURIComponent(unit);
       
-      // Get all questions for this unit
+      const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
+      if (!spreadsheetId) {
+        return res.status(400).json({
+          message: "GOOGLE_SPREADSHEET_ID가 설정되지 않았습니다.",
+        });
+      }
+
+      // Get all questions for this unit (정답 정보)
       const questions = await storage.getQuestionsByUnit(decodedUnit);
       const multipleChoiceQuestions = questions.filter(q => q.type === "객관식");
       
-      // Get all test results for this unit
-      const allResults = await storage.getAllTestResults();
-      const unitResults = allResults.filter(r => r.unit === decodedUnit);
+      // Get question responses from Google Sheets (학생 답안)
+      const responses = await readQuestionResponsesFromSheet(spreadsheetId, decodedUnit);
+      
+      // Count unique students
+      const uniqueStudents = new Set(responses.map(r => r.studentId));
       
       // Analyze each question
       const questionStats = multipleChoiceQuestions.map(question => {
@@ -351,22 +360,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           wrongRate: 0,
         };
 
-        // Analyze each student's answer
-        unitResults.forEach(result => {
-          try {
-            const studentAnswers = JSON.parse(result.answers);
-            const studentAnswer = studentAnswers.find((a: any) => a.questionId === question.questionId);
+        // Find all responses for this question
+        const questionResponses = responses.filter(r => r.questionId === question.questionId);
+        
+        questionResponses.forEach(response => {
+          if (response.studentAnswer) {
+            stats.totalAttempts++;
+            stats.answerDistribution[response.studentAnswer] = (stats.answerDistribution[response.studentAnswer] || 0) + 1;
             
-            if (studentAnswer && studentAnswer.answer) {
-              stats.totalAttempts++;
-              stats.answerDistribution[studentAnswer.answer] = (stats.answerDistribution[studentAnswer.answer] || 0) + 1;
-              
-              if (studentAnswer.answer !== question.answer) {
-                stats.wrongAttempts++;
-              }
+            if (response.studentAnswer !== question.answer) {
+              stats.wrongAttempts++;
             }
-          } catch (e) {
-            // Skip invalid JSON
           }
         });
 
@@ -383,7 +387,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({
         unit: decodedUnit,
         totalQuestions: multipleChoiceQuestions.length,
-        totalStudents: unitResults.length,
+        totalStudents: uniqueStudents.size,
         questionStats,
       });
     } catch (error: any) {

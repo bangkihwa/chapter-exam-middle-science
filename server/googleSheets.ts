@@ -71,9 +71,12 @@ export async function readStudentsFromSheet(spreadsheetId: string) {
 export async function writeResultToSheet(spreadsheetId: string, result: any) {
   try {
     const sheets = await getUncachableGoogleSheetClient();
+    const timestamp = new Date(result.submittedAt).toLocaleString('ko-KR');
+    
+    // 1. 시험결과 탭에 요약 저장
     await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: '시험결과!A:G', // Assuming columns: 학생ID, 학생이름, 교재이름, 단원, 과제입력일시, 성취율, 피드백
+      range: '시험결과!A:G',
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [[
@@ -81,12 +84,36 @@ export async function writeResultToSheet(spreadsheetId: string, result: any) {
           result.studentName,
           result.textbook,
           result.unit,
-          new Date(result.submittedAt).toLocaleString('ko-KR'),
+          timestamp,
           `${result.achievementRate}%`,
           result.feedback || ''
         ]],
       },
     });
+
+    // 2. 문항응답 탭에 각 문제별 답안 저장
+    const studentAnswers = JSON.parse(result.answers);
+    const questionRows = studentAnswers.map((ans: any) => [
+      `${result.studentId}_${timestamp}`, // submissionId
+      result.studentId,
+      result.studentName,
+      result.unit,
+      ans.questionId,
+      ans.answer,
+      timestamp
+    ]);
+
+    if (questionRows.length > 0) {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: '문항응답!A:G', // submissionId, 학생ID, 학생이름, 단원, 문제번호, 학생답안, 응시일시
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+          values: questionRows,
+        },
+      });
+    }
+
     return true;
   } catch (error) {
     console.error('Error writing result to Google Sheets:', error);
@@ -114,6 +141,37 @@ export async function readResultsFromSheet(spreadsheetId: string) {
     }));
   } catch (error) {
     console.error('Error reading results from Google Sheets:', error);
+    return [];
+  }
+}
+
+export async function readQuestionResponsesFromSheet(spreadsheetId: string, unit?: string) {
+  try {
+    const sheets = await getUncachableGoogleSheetClient();
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: '문항응답!A2:G', // submissionId, 학생ID, 학생이름, 단원, 문제번호, 학생답안, 응시일시
+    });
+
+    const rows = response.data.values || [];
+    const allResponses = rows.map(row => ({
+      submissionId: row[0] || '',
+      studentId: row[1] || '',
+      studentName: row[2] || '',
+      unit: row[3] || '',
+      questionId: row[4] || '',
+      studentAnswer: row[5] || '',
+      submittedAt: row[6] || '',
+    }));
+
+    // 단원 필터링
+    if (unit) {
+      return allResponses.filter(r => r.unit === unit);
+    }
+    
+    return allResponses;
+  } catch (error) {
+    console.error('Error reading question responses from Google Sheets:', error);
     return [];
   }
 }
