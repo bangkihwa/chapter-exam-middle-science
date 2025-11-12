@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { loginSchema, submitTestSchema, TEXTBOOK_NAME, units } from "@shared/schema";
-import { writeResultToSheet, readStudentsFromSheet, readResultsFromSheet, readQuestionResponsesFromSheet } from "./googleSheets";
+import { writeResultToSheet, readStudentsFromSheet, readResultsFromSheet, readQuestionStats } from "./googleSheets";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Login endpoint
@@ -84,6 +84,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (isCorrect) {
           correctAnswers++;
+        }
+        
+        // 정답 정보를 답안 객체에 추가 (구글 시트 집계용)
+        if (studentAnswer) {
+          studentAnswer.correctAnswer = question.answer;
         }
         
         return {
@@ -351,58 +356,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Get all questions for this unit (정답 정보)
-      const questions = await storage.getQuestionsByUnit(decodedUnit);
-      const multipleChoiceQuestions = questions.filter(q => q.type === "객관식");
+      // Get aggregated question statistics from Google Sheets
+      console.log(`[Admin Stats] Reading question stats for unit: ${decodedUnit}`);
+      const questionStatsFromSheet = await readQuestionStats(spreadsheetId, decodedUnit);
       
-      // Get question responses from Google Sheets (학생 답안)
-      const responses = await readQuestionResponsesFromSheet(spreadsheetId, decodedUnit);
+      // Count unique students (approximate - based on total attempts)
+      const totalAttempts = questionStatsFromSheet.reduce((sum, stat) => sum + stat.totalAttempts, 0);
+      const avgAttemptsPerQuestion = questionStatsFromSheet.length > 0 
+        ? totalAttempts / questionStatsFromSheet.length 
+        : 0;
+      const estimatedStudents = Math.round(avgAttemptsPerQuestion);
       
-      // Count unique students
-      const uniqueStudents = new Set(responses.map(r => r.studentId));
-      
-      // Analyze each question
-      const questionStats = multipleChoiceQuestions.map(question => {
-        const stats = {
-          questionId: question.questionId,
-          correctAnswer: question.answer,
-          totalAttempts: 0,
-          wrongAttempts: 0,
-          answerDistribution: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 } as Record<string, number>,
-          wrongRate: 0,
-        };
-
-        // Find all responses for this question
-        const questionResponses = responses.filter(r => r.questionId === question.questionId);
-        
-        questionResponses.forEach(response => {
-          if (response.studentAnswer) {
-            stats.totalAttempts++;
-            stats.answerDistribution[response.studentAnswer] = (stats.answerDistribution[response.studentAnswer] || 0) + 1;
-            
-            if (response.studentAnswer !== question.answer) {
-              stats.wrongAttempts++;
-            }
-          }
-        });
-
-        stats.wrongRate = stats.totalAttempts > 0 
-          ? Math.round((stats.wrongAttempts / stats.totalAttempts) * 100)
-          : 0;
-
-        return stats;
-      });
+      // Format for frontend
+      const questionStats = questionStatsFromSheet.map(stat => ({
+        questionId: stat.questionId,
+        correctAnswer: stat.correctAnswer,
+        totalAttempts: stat.totalAttempts,
+        wrongAttempts: stat.wrongAttempts,
+        answerDistribution: stat.answerDistribution,
+        wrongRate: stat.totalAttempts > 0 
+          ? Math.round((stat.wrongAttempts / stat.totalAttempts) * 100)
+          : 0,
+      }));
 
       // Sort by wrong rate (highest first)
       questionStats.sort((a, b) => b.wrongRate - a.wrongRate);
 
+      console.log(`[Admin Stats] Found ${questionStats.length} questions with stats`);
+
       return res.json({
         unit: decodedUnit,
-        totalQuestions: multipleChoiceQuestions.length,
-        totalStudents: uniqueStudents.size,
+        totalQuestions: questionStats.length,
+        totalStudents: estimatedStudents,
         questionStats,
       });
     } catch (error: any) {
+      console.error(`[Admin Stats] Error:`, error);
       return res.status(500).json({
         message: error.message || "통계 데이터를 불러오는 중 오류가 발생했습니다.",
       });

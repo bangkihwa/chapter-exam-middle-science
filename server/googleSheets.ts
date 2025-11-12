@@ -95,39 +95,10 @@ export async function writeResultToSheet(spreadsheetId: string, result: any) {
     });
     console.log(`[Google Sheets] ✓ Summary written successfully`);
 
-    // 2. 문항응답 탭 확인 및 생성
-    console.log(`[Google Sheets] Ensuring 문항응답 tab exists...`);
-    await ensureSheetExists(spreadsheetId, '문항응답');
-    console.log(`[Google Sheets] ✓ 문항응답 tab ready`);
-
-    // 3. 문항응답 탭에 각 문제별 답안 저장
-    const studentAnswers = JSON.parse(result.answers);
-    console.log(`[Google Sheets] Parsing ${studentAnswers.length} student answers...`);
-    
-    const questionRows = studentAnswers.map((ans: any) => [
-      `${result.studentId}_${timestamp}`, // submissionId
-      result.studentId,
-      result.studentName,
-      result.unit,
-      ans.questionId,
-      ans.answer,
-      timestamp
-    ]);
-
-    if (questionRows.length > 0) {
-      console.log(`[Google Sheets] Writing ${questionRows.length} question responses to 문항응답...`);
-      const appendResult = await sheets.spreadsheets.values.append({
-        spreadsheetId,
-        range: "'문항응답'!A:G", // submissionId, 학생ID, 학생이름, 단원, 문제번호, 학생답안, 응시일시
-        valueInputOption: 'USER_ENTERED',
-        requestBody: {
-          values: questionRows,
-        },
-      });
-      console.log(`[Google Sheets] ✓ Question responses written: ${appendResult.data.updates?.updatedRows || 0} rows`);
-    } else {
-      console.warn(`[Google Sheets] ⚠ No question answers to write!`);
-    }
+    // 2. 문항통계 탭에 집계 데이터 업데이트
+    console.log(`[Google Sheets] Updating question statistics...`);
+    await updateQuestionStats(spreadsheetId, result.unit, JSON.parse(result.answers));
+    console.log(`[Google Sheets] ✓ Question statistics updated`);
 
     console.log(`[Google Sheets] ✅ All data written successfully for ${result.studentId}`);
     return true;
@@ -191,13 +162,13 @@ async function ensureSheetExists(spreadsheetId: string, sheetName: string) {
       });
 
       // 헤더 추가
-      if (sheetName === '문항응답') {
+      if (sheetName === '문항통계') {
         await sheets.spreadsheets.values.update({
           spreadsheetId,
-          range: `'${sheetName}'!A1:G1`,
+          range: `'${sheetName}'!A1:K1`,
           valueInputOption: 'USER_ENTERED',
           requestBody: {
-            values: [['응시ID', '학생ID', '학생이름', '단원', '문제번호', '학생답안', '응시일시']],
+            values: [['단원', '문제번호', '정답', '총응시수', '오답수', '1번선택', '2번선택', '3번선택', '4번선택', '5번선택', '최종수정일시']],
           },
         });
       }
@@ -207,36 +178,175 @@ async function ensureSheetExists(spreadsheetId: string, sheetName: string) {
   }
 }
 
-export async function readQuestionResponsesFromSheet(spreadsheetId: string, unit?: string) {
+// 문항 통계 업데이트 (집계 방식)
+async function updateQuestionStats(spreadsheetId: string, unit: string, studentAnswers: any[]) {
   try {
-    // 시트가 없으면 생성
-    await ensureSheetExists(spreadsheetId, '문항응답');
+    // 문항통계 시트 확인 및 생성
+    await ensureSheetExists(spreadsheetId, '문항통계');
+    
+    const sheets = await getUncachableGoogleSheetClient();
+    const timestamp = new Date().toLocaleString('ko-KR');
+    
+    // 기존 통계 읽기
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "'문항통계'!A2:K",
+    });
+
+    const existingRows = response.data.values || [];
+    const statsMap = new Map<string, any>();
+    
+    // 기존 데이터를 맵으로 변환
+    existingRows.forEach((row, index) => {
+      const key = `${row[0]}_${row[1]}`; // 단원_문제번호
+      statsMap.set(key, {
+        rowIndex: index + 2, // 시트는 1-based, 헤더 제외
+        unit: row[0],
+        questionId: row[1],
+        correctAnswer: row[2],
+        totalAttempts: parseInt(row[3]) || 0,
+        wrongAttempts: parseInt(row[4]) || 0,
+        answer1: parseInt(row[5]) || 0,
+        answer2: parseInt(row[6]) || 0,
+        answer3: parseInt(row[7]) || 0,
+        answer4: parseInt(row[8]) || 0,
+        answer5: parseInt(row[9]) || 0,
+      });
+    });
+
+    // 새 답안으로 통계 업데이트
+    const updatedRows: any[] = [];
+    const newRows: any[] = [];
+
+    studentAnswers.forEach((ans: any) => {
+      const key = `${unit}_${ans.questionId}`;
+      const existing = statsMap.get(key);
+      
+      if (existing) {
+        // 기존 통계 업데이트
+        existing.totalAttempts++;
+        if (ans.answer !== ans.correctAnswer) {
+          existing.wrongAttempts++;
+        }
+        existing[`answer${ans.answer}`] = (existing[`answer${ans.answer}`] || 0) + 1;
+        
+        updatedRows.push({
+          range: `'문항통계'!A${existing.rowIndex}:K${existing.rowIndex}`,
+          values: [[
+            existing.unit,
+            existing.questionId,
+            existing.correctAnswer,
+            existing.totalAttempts,
+            existing.wrongAttempts,
+            existing.answer1,
+            existing.answer2,
+            existing.answer3,
+            existing.answer4,
+            existing.answer5,
+            timestamp
+          ]]
+        });
+      } else {
+        // 새 문제 통계 추가
+        const stats = {
+          unit,
+          questionId: ans.questionId,
+          correctAnswer: ans.correctAnswer || '',
+          totalAttempts: 1,
+          wrongAttempts: ans.answer !== ans.correctAnswer ? 1 : 0,
+          answer1: ans.answer === '1' ? 1 : 0,
+          answer2: ans.answer === '2' ? 1 : 0,
+          answer3: ans.answer === '3' ? 1 : 0,
+          answer4: ans.answer === '4' ? 1 : 0,
+          answer5: ans.answer === '5' ? 1 : 0,
+        };
+        
+        newRows.push([
+          stats.unit,
+          stats.questionId,
+          stats.correctAnswer,
+          stats.totalAttempts,
+          stats.wrongAttempts,
+          stats.answer1,
+          stats.answer2,
+          stats.answer3,
+          stats.answer4,
+          stats.answer5,
+          timestamp
+        ]);
+        
+        statsMap.set(key, stats);
+      }
+    });
+
+    // 배치 업데이트
+    if (updatedRows.length > 0) {
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          valueInputOption: 'USER_ENTERED',
+          data: updatedRows,
+        },
+      });
+      console.log(`[Google Sheets] Updated ${updatedRows.length} existing question stats`);
+    }
+
+    // 새 행 추가
+    if (newRows.length > 0) {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: "'문항통계'!A:K",
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+          values: newRows,
+        },
+      });
+      console.log(`[Google Sheets] Added ${newRows.length} new question stats`);
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error updating question statistics:', error);
+    throw error;
+  }
+}
+
+// 문항 통계 읽기
+export async function readQuestionStats(spreadsheetId: string, unit?: string) {
+  try {
+    await ensureSheetExists(spreadsheetId, '문항통계');
     
     const sheets = await getUncachableGoogleSheetClient();
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: "'문항응답'!A2:G", // submissionId, 학생ID, 학생이름, 단원, 문제번호, 학생답안, 응시일시
+      range: "'문항통계'!A2:K",
     });
 
     const rows = response.data.values || [];
-    const allResponses = rows.map(row => ({
-      submissionId: row[0] || '',
-      studentId: row[1] || '',
-      studentName: row[2] || '',
-      unit: row[3] || '',
-      questionId: row[4] || '',
-      studentAnswer: row[5] || '',
-      submittedAt: row[6] || '',
+    const stats = rows.map(row => ({
+      unit: row[0] || '',
+      questionId: row[1] || '',
+      correctAnswer: row[2] || '',
+      totalAttempts: parseInt(row[3]) || 0,
+      wrongAttempts: parseInt(row[4]) || 0,
+      answerDistribution: {
+        '1': parseInt(row[5]) || 0,
+        '2': parseInt(row[6]) || 0,
+        '3': parseInt(row[7]) || 0,
+        '4': parseInt(row[8]) || 0,
+        '5': parseInt(row[9]) || 0,
+      },
+      lastUpdated: row[10] || '',
     }));
 
     // 단원 필터링
     if (unit) {
-      return allResponses.filter(r => r.unit === unit);
+      return stats.filter(s => s.unit === unit);
     }
     
-    return allResponses;
+    return stats;
   } catch (error) {
-    console.error('Error reading question responses from Google Sheets:', error);
+    console.error('Error reading question statistics:', error);
     return [];
   }
 }
