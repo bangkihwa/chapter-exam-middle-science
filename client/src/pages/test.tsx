@@ -5,10 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, ChevronRight, Send, BookOpen } from "lucide-react";
+import { ChevronLeft, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Question, SubmitTest } from "@shared/schema";
@@ -22,7 +20,6 @@ export default function TestPage() {
   const studentData = sessionStorage.getItem("student");
   const student = studentData ? JSON.parse(studentData) : null;
 
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -55,32 +52,12 @@ export default function TestPage() {
   });
 
   const multipleChoiceQuestions = questions?.filter(q => q.type === "객관식") || [];
-  const currentQuestion = multipleChoiceQuestions[currentQuestionIndex];
-
   const answeredCount = Object.keys(answers).length;
   const totalQuestions = multipleChoiceQuestions.length;
   const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
 
-  const handleAnswer = (answer: string) => {
-    if (currentQuestion) {
-      setAnswers(prev => ({ ...prev, [currentQuestion.questionId]: answer }));
-    }
-  };
-
-  const handleNext = () => {
-    if (currentQuestionIndex < multipleChoiceQuestions.length - 1) {
-      setCurrentQuestionIndex(prev => prev + 1);
-    }
-  };
-
-  const handlePrevious = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev - 1);
-    }
-  };
-
-  const handleQuestionNavigation = (index: number) => {
-    setCurrentQuestionIndex(index);
+  const handleAnswer = (questionId: string, answer: string) => {
+    setAnswers(prev => ({ ...prev, [questionId]: answer }));
   };
 
   const handleSubmit = () => {
@@ -115,16 +92,13 @@ export default function TestPage() {
       <div className="min-h-screen bg-background p-4">
         <div className="container mx-auto max-w-6xl space-y-6">
           <Skeleton className="h-16 w-full" />
-          <div className="grid lg:grid-cols-[300px_1fr] gap-6">
-            <Skeleton className="h-96" />
-            <Skeleton className="h-96" />
-          </div>
+          <Skeleton className="h-96 w-full" />
         </div>
       </div>
     );
   }
 
-  if (!currentQuestion) {
+  if (multipleChoiceQuestions.length === 0) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="max-w-md">
@@ -167,138 +141,92 @@ export default function TestPage() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6">
-        <div className="max-w-6xl mx-auto space-y-6">
-          <Card className="lg:hidden">
-            <CardContent className="p-4">
-              <h3 className="font-semibold text-sm mb-3">문제 번호</h3>
-              <div className="grid grid-cols-5 gap-2">
-                {multipleChoiceQuestions.map((q, index) => {
-                  const isAnswered = !!answers[q.questionId];
-                  const isCurrent = index === currentQuestionIndex;
-                  
+      <main className="container mx-auto px-4 py-8">
+        <div className="max-w-5xl mx-auto space-y-8">
+          <Card className="shadow-lg">
+            <CardContent className="p-8">
+              <div className="text-center space-y-4 mb-8">
+                <h1 className="text-3xl font-bold">OMR 답안지</h1>
+                <p className="text-muted-foreground">
+                  객관식 문제의 정답을 선택하세요. (주관식 문항은 자동 정답 처리됩니다.)
+                </p>
+              </div>
+
+              <div className="space-y-6">
+                {Array.from({ length: Math.ceil(multipleChoiceQuestions.length / 2) }).map((_, rowIndex) => {
+                  const leftIndex = rowIndex * 2;
+                  const rightIndex = rowIndex * 2 + 1;
+                  const leftQuestion = multipleChoiceQuestions[leftIndex];
+                  const rightQuestion = multipleChoiceQuestions[rightIndex];
+
                   return (
-                    <Button
-                      key={q.questionId}
-                      variant={isCurrent ? "default" : isAnswered ? "secondary" : "outline"}
-                      size="sm"
-                      className="h-10 font-mono"
-                      onClick={() => handleQuestionNavigation(index)}
-                      data-testid={`button-nav-${index}`}
-                    >
-                      {index + 1}
-                    </Button>
+                    <div key={rowIndex} className="grid md:grid-cols-2 gap-8">
+                      {leftQuestion && (
+                        <div className="flex items-center gap-4">
+                          <div className="font-bold text-lg min-w-[4rem]">
+                            {leftIndex + 1}번
+                          </div>
+                          <div className="flex gap-2">
+                            {[1, 2, 3, 4, 5].map((option) => (
+                              <button
+                                key={option}
+                                onClick={() => handleAnswer(leftQuestion.questionId, option.toString())}
+                                className={`w-12 h-12 rounded-full border-2 font-medium transition-all hover-elevate ${
+                                  answers[leftQuestion.questionId] === option.toString()
+                                    ? "bg-primary text-primary-foreground border-primary"
+                                    : "border-border hover:border-primary/50"
+                                }`}
+                                data-testid={`answer-${leftIndex}-${option}`}
+                              >
+                                {option}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {rightQuestion && (
+                        <div className="flex items-center gap-4">
+                          <div className="font-bold text-lg min-w-[4rem]">
+                            {rightIndex + 1}번
+                          </div>
+                          <div className="flex gap-2">
+                            {[1, 2, 3, 4, 5].map((option) => (
+                              <button
+                                key={option}
+                                onClick={() => handleAnswer(rightQuestion.questionId, option.toString())}
+                                className={`w-12 h-12 rounded-full border-2 font-medium transition-all hover-elevate ${
+                                  answers[rightQuestion.questionId] === option.toString()
+                                    ? "bg-primary text-primary-foreground border-primary"
+                                    : "border-border hover:border-primary/50"
+                                }`}
+                                data-testid={`answer-${rightIndex}-${option}`}
+                              >
+                                {option}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
             </CardContent>
           </Card>
 
-          <div className="grid lg:grid-cols-[300px_1fr] gap-6">
-            <Card className="hidden lg:block h-fit sticky top-24">
-              <CardContent className="p-4 space-y-4">
-                <h3 className="font-semibold text-sm">문제 번호</h3>
-                <div className="grid grid-cols-5 gap-2">
-                  {multipleChoiceQuestions.map((q, index) => {
-                    const isAnswered = !!answers[q.questionId];
-                    const isCurrent = index === currentQuestionIndex;
-                    
-                    return (
-                      <Button
-                        key={q.questionId}
-                        variant={isCurrent ? "default" : isAnswered ? "secondary" : "outline"}
-                        size="sm"
-                        className="h-10 font-mono"
-                        onClick={() => handleQuestionNavigation(index)}
-                        data-testid={`button-nav-${index}`}
-                      >
-                        {index + 1}
-                      </Button>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="space-y-6">
-            <Card>
-              <CardContent className="p-8 space-y-8">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <Badge className="mb-3 font-mono">
-                      문제 {currentQuestion.questionId}
-                    </Badge>
-                    <h2 className="text-2xl font-bold">
-                      {currentQuestionIndex + 1}번 문제
-                    </h2>
-                  </div>
-                  <Badge variant="outline" className="font-mono">
-                    {currentQuestionIndex + 1} / {totalQuestions}
-                  </Badge>
-                </div>
-
-                <RadioGroup
-                  value={answers[currentQuestion.questionId] || ""}
-                  onValueChange={handleAnswer}
-                  className="space-y-4"
-                >
-                  {[1, 2, 3, 4, 5].map((option) => (
-                    <div
-                      key={option}
-                      className="flex items-center space-x-3 rounded-lg border p-4 hover-elevate cursor-pointer"
-                      onClick={() => handleAnswer(option.toString())}
-                    >
-                      <RadioGroupItem
-                        value={option.toString()}
-                        id={`option-${option}`}
-                        data-testid={`radio-option-${option}`}
-                      />
-                      <Label
-                        htmlFor={`option-${option}`}
-                        className="flex-1 cursor-pointer text-lg font-medium"
-                      >
-                        {option}번
-                      </Label>
-                    </div>
-                  ))}
-                </RadioGroup>
-              </CardContent>
-            </Card>
-
-            <div className="flex items-center justify-between gap-4">
-              <Button
-                variant="outline"
-                onClick={handlePrevious}
-                disabled={currentQuestionIndex === 0}
-                data-testid="button-previous"
-              >
-                <ChevronLeft className="w-4 h-4 mr-2" />
-                이전
-              </Button>
-
-              {currentQuestionIndex === multipleChoiceQuestions.length - 1 ? (
-                <Button
-                  onClick={handleSubmit}
-                  disabled={submitMutation.isPending || answeredCount < totalQuestions}
-                  className="px-8"
-                  data-testid="button-submit"
-                >
-                  <Send className="w-4 h-4 mr-2" />
-                  {submitMutation.isPending ? "제출 중..." : "제출하기"}
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleNext}
-                  disabled={currentQuestionIndex === multipleChoiceQuestions.length - 1}
-                  data-testid="button-next"
-                >
-                  다음
-                  <ChevronRight className="w-4 h-4 ml-2" />
-                </Button>
-              )}
-            </div>
+          <div className="flex justify-center">
+            <Button
+              size="lg"
+              onClick={handleSubmit}
+              disabled={submitMutation.isPending || answeredCount < totalQuestions}
+              className="px-12"
+              data-testid="button-submit"
+            >
+              <Send className="w-5 h-5 mr-2" />
+              {submitMutation.isPending ? "제출 중..." : "제출하기"}
+            </Button>
           </div>
-        </div>
         </div>
       </main>
     </div>
