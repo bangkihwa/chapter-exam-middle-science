@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ShieldCheck, Users, BarChart3, AlertCircle, TrendingDown, LogOut, Search, Calendar } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import type { Student } from "@shared/schema";
+import type { Student, TestResult } from "@shared/schema";
 import { units } from "@shared/schema";
+import { StudentReportView } from "@/components/student-report-view";
 
 interface SheetResult {
   studentId: string;
@@ -295,79 +296,48 @@ export default function AdminPage() {
               )}
 
               {/* 선택된 학생의 상세 성적 */}
-              {selectedStudent && (
-                <>
-                  <Card className="shadow-lg border-2 border-primary/30">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="text-2xl mb-2">{selectedStudent.studentName} 학생 성적표</CardTitle>
-                          <CardDescription className="flex items-center gap-4">
-                            <span>학생 ID: {selectedStudent.studentId}</span>
-                            <span>총 {selectedStudentResults.length}회 응시</span>
-                            <Badge className="text-base">평균 {selectedStudentAvg}%</Badge>
-                          </CardDescription>
-                        </div>
-                        <Button
-                          variant="outline"
-                          onClick={() => setSelectedStudent(null)}
-                        >
-                          목록으로
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {selectedStudentResults.length === 0 ? (
-                          <p className="text-center text-muted-foreground py-8">
-                            응시 기록이 없습니다
-                          </p>
-                        ) : (
-                          selectedStudentResults.map((result, index) => {
-                            const gradeColor = result.achievementRate >= 90 ? "text-green-600" :
-                                              result.achievementRate >= 80 ? "text-blue-600" :
-                                              result.achievementRate >= 70 ? "text-yellow-600" :
-                                              result.achievementRate >= 60 ? "text-orange-600" : "text-red-600";
-                            const gradeBg = result.achievementRate >= 90 ? "bg-green-500/10" :
-                                           result.achievementRate >= 80 ? "bg-blue-500/10" :
-                                           result.achievementRate >= 70 ? "bg-yellow-500/10" :
-                                           result.achievementRate >= 60 ? "bg-orange-500/10" : "bg-red-500/10";
-
-                            return (
-                              <div
-                                key={index}
-                                className={`flex items-center gap-4 p-5 rounded-xl border-2 ${gradeBg}`}
-                              >
-                                <div className={`w-16 h-16 rounded-full flex items-center justify-center ${gradeBg} border-2`}>
-                                  <span className={`text-2xl font-bold ${gradeColor}`}>
-                                    {result.achievementRate}
-                                  </span>
-                                </div>
-                                <div className="flex-1 grid md:grid-cols-3 gap-4">
-                                  <div>
-                                    <p className="text-sm text-muted-foreground mb-1">단원</p>
-                                    <p className="font-bold">{result.unit}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm text-muted-foreground mb-1">응시 일시</p>
-                                    <p className="text-sm flex items-center gap-1">
-                                      <Calendar className="w-3 h-3" />
-                                      {result.submittedAt}
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm text-muted-foreground mb-1">피드백</p>
-                                    <p className="text-sm">{result.feedback}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </>
+              {selectedStudent && selectedStudentResults.length > 0 && (
+                <Card className="shadow-lg border-2 border-primary/30">
+                  <CardContent className="pt-6">
+                    <StudentReportView
+                      results={selectedStudentResults.map(r => ({
+                        id: 0,
+                        studentId: r.studentId,
+                        studentName: r.studentName,
+                        textbook: r.textbook,
+                        unit: r.unit,
+                        submittedAt: new Date(r.submittedAt),
+                        achievementRate: r.achievementRate,
+                        score: r.achievementRate,
+                        totalQuestions: 0,
+                        correctAnswers: Math.round(r.achievementRate / 100),
+                        feedback: r.feedback,
+                        answers: "[]",
+                      }))}
+                      studentName={selectedStudent.studentName}
+                      studentId={selectedStudent.studentId}
+                      showBackButton={true}
+                      onBack={() => setSelectedStudent(null)}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+              
+              {selectedStudent && selectedStudentResults.length === 0 && (
+                <Card className="shadow-lg">
+                  <CardContent className="py-12 text-center">
+                    <p className="text-lg font-semibold text-muted-foreground">
+                      {selectedStudent.studentName} 학생의 응시 기록이 없습니다
+                    </p>
+                    <Button
+                      variant="outline"
+                      className="mt-4"
+                      onClick={() => setSelectedStudent(null)}
+                    >
+                      목록으로
+                    </Button>
+                  </CardContent>
+                </Card>
               )}
             </TabsContent>
 
