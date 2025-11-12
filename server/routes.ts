@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { loginSchema, submitTestSchema, TEXTBOOK_NAME, units } from "@shared/schema";
-import { writeResultToSheet, readStudentsFromSheet } from "./googleSheets";
+import { writeResultToSheet, readStudentsFromSheet, readResultsFromSheet } from "./googleSheets";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Login endpoint
@@ -307,11 +307,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all test results (admin only)
+  // Get all test results from Google Sheets (admin only)
   app.get("/api/admin/all-results", async (req, res) => {
     try {
-      const allResults = await storage.getAllTestResults();
-      return res.json(allResults);
+      const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
+      if (!spreadsheetId) {
+        return res.status(400).json({
+          message: "GOOGLE_SPREADSHEET_ID가 설정되지 않았습니다.",
+        });
+      }
+
+      const resultsFromSheet = await readResultsFromSheet(spreadsheetId);
+      return res.json(resultsFromSheet);
     } catch (error: any) {
       return res.status(500).json({
         message: error.message || "성적 데이터를 불러오는 중 오류가 발생했습니다.",

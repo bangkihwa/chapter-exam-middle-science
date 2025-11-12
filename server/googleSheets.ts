@@ -93,3 +93,27 @@ export async function writeResultToSheet(spreadsheetId: string, result: any) {
     return false;
   }
 }
+
+export async function readResultsFromSheet(spreadsheetId: string) {
+  try {
+    const sheets = await getUncachableGoogleSheetClient();
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: '시험결과!A2:G', // Skip header row
+    });
+
+    const rows = response.data.values || [];
+    return rows.map(row => ({
+      studentId: row[0] || '',
+      studentName: row[1] || '',
+      textbook: row[2] || '',
+      unit: row[3] || '',
+      submittedAt: row[4] || '',
+      achievementRate: parseInt(row[5]?.replace('%', '') || '0'),
+      feedback: row[6] || '',
+    }));
+  } catch (error) {
+    console.error('Error reading results from Google Sheets:', error);
+    return [];
+  }
+}

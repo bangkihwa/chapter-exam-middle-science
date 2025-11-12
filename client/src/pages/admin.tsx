@@ -5,11 +5,22 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ShieldCheck, Users, BarChart3, AlertCircle, TrendingDown, LogOut } from "lucide-react";
+import { ShieldCheck, Users, BarChart3, AlertCircle, TrendingDown, LogOut, Search, Calendar } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import type { TestResult, Student } from "@shared/schema";
+import type { Student } from "@shared/schema";
 import { units } from "@shared/schema";
+
+interface SheetResult {
+  studentId: string;
+  studentName: string;
+  textbook: string;
+  unit: string;
+  submittedAt: string;
+  achievementRate: number;
+  feedback: string;
+}
 
 interface QuestionStat {
   questionId: string;
@@ -30,6 +41,8 @@ interface UnitStats {
 export default function AdminPage() {
   const [, setLocation] = useLocation();
   const [selectedUnit, setSelectedUnit] = useState(units[0]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
   useEffect(() => {
     const isAdmin = sessionStorage.getItem("admin");
@@ -38,7 +51,7 @@ export default function AdminPage() {
     }
   }, [setLocation]);
 
-  const { data: allResults, isLoading: resultsLoading } = useQuery<TestResult[]>({
+  const { data: allResults, isLoading: resultsLoading } = useQuery<SheetResult[]>({
     queryKey: ["/api/admin/all-results"],
   });
 
@@ -78,8 +91,23 @@ export default function AdminPage() {
     ? Math.round(allResults!.reduce((sum, r) => sum + r.achievementRate, 0) / totalTests)
     : 0;
 
-  // 학생별 통계
-  const studentStats = students?.map(student => {
+  // 학생 검색 필터
+  const filteredStudents = students?.filter(student =>
+    student.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    student.studentId.toLowerCase().includes(searchQuery.toLowerCase())
+  ) || [];
+
+  // 선택된 학생의 모든 성적
+  const selectedStudentResults = selectedStudent
+    ? allResults?.filter(r => r.studentId === selectedStudent.studentId) || []
+    : [];
+
+  const selectedStudentAvg = selectedStudentResults.length > 0
+    ? Math.round(selectedStudentResults.reduce((sum, r) => sum + r.achievementRate, 0) / selectedStudentResults.length)
+    : 0;
+
+  // 학생별 통계 (검색 결과용)
+  const studentStats = filteredStudents.map(student => {
     const studentResults = allResults?.filter(r => r.studentId === student.studentId) || [];
     const avgScore = studentResults.length > 0
       ? Math.round(studentResults.reduce((sum, r) => sum + r.achievementRate, 0) / studentResults.length)
@@ -91,7 +119,7 @@ export default function AdminPage() {
       averageScore: avgScore,
       bestScore: studentResults.length > 0 ? Math.max(...studentResults.map(r => r.achievementRate)) : 0,
     };
-  }).sort((a, b) => b.averageScore - a.averageScore) || [];
+  }).sort((a, b) => b.averageScore - a.averageScore);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10">
@@ -155,74 +183,175 @@ export default function AdminPage() {
           {/* 탭 메뉴 */}
           <Tabs defaultValue="students" className="space-y-6">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="students">학생별 성적</TabsTrigger>
+              <TabsTrigger value="students">학생 검색 및 성적</TabsTrigger>
               <TabsTrigger value="questions">단원별 오답 분석</TabsTrigger>
             </TabsList>
 
-            {/* 학생별 성적 */}
+            {/* 학생 검색 및 성적 */}
             <TabsContent value="students" className="space-y-4">
+              {/* 검색 바 */}
               <Card className="shadow-lg">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Users className="w-6 h-6" />
-                    전체 학생 성적 현황
+                    <Search className="w-6 h-6" />
+                    학생 검색
                   </CardTitle>
-                  <CardDescription>
-                    모든 학생의 평균 성취율과 응시 기록
-                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    {studentStats.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-8">
-                        등록된 학생이 없습니다
-                      </p>
-                    ) : (
-                      studentStats.map((student, index) => {
-                        const gradeColor = student.averageScore >= 90 ? "text-green-600" :
-                                          student.averageScore >= 80 ? "text-blue-600" :
-                                          student.averageScore >= 70 ? "text-yellow-600" :
-                                          student.averageScore >= 60 ? "text-orange-600" : "text-red-600";
-                        const gradeBg = student.averageScore >= 90 ? "bg-green-500/10" :
-                                       student.averageScore >= 80 ? "bg-blue-500/10" :
-                                       student.averageScore >= 70 ? "bg-yellow-500/10" :
-                                       student.averageScore >= 60 ? "bg-orange-500/10" : "bg-red-500/10";
-
-                        return (
-                          <div
-                            key={student.studentId}
-                            className="flex items-center gap-4 p-4 rounded-lg border-2 hover-elevate"
-                          >
-                            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 font-bold text-primary">
-                              {index + 1}
-                            </div>
-                            <div className="flex-1 grid md:grid-cols-4 gap-4">
-                              <div>
-                                <p className="text-sm text-muted-foreground">이름</p>
-                                <p className="font-semibold">{student.studentName}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-muted-foreground">학생 ID</p>
-                                <p className="font-mono text-sm">{student.studentId}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-muted-foreground">응시 횟수</p>
-                                <p className="font-semibold">{student.totalTests}회</p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-muted-foreground">평균 성취율</p>
-                                <Badge className={`${gradeBg} ${gradeColor} font-mono text-base`}>
-                                  {student.averageScore}%
-                                </Badge>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
+                  <Input
+                    placeholder="학생 이름 또는 ID로 검색..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setSelectedStudent(null);
+                    }}
+                    className="text-lg"
+                    data-testid="input-student-search"
+                  />
                 </CardContent>
               </Card>
+
+              {/* 검색 결과 또는 학생 목록 */}
+              {!selectedStudent && (
+                <Card className="shadow-lg">
+                  <CardHeader>
+                    <CardTitle>
+                      {searchQuery ? `검색 결과 (${studentStats.length}명)` : `전체 학생 (${studentStats.length}명)`}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {studentStats.length === 0 ? (
+                        <p className="text-center text-muted-foreground py-8">
+                          {searchQuery ? "검색 결과가 없습니다" : "등록된 학생이 없습니다"}
+                        </p>
+                      ) : (
+                        studentStats.map((student, index) => {
+                          const gradeColor = student.averageScore >= 90 ? "text-green-600" :
+                                            student.averageScore >= 80 ? "text-blue-600" :
+                                            student.averageScore >= 70 ? "text-yellow-600" :
+                                            student.averageScore >= 60 ? "text-orange-600" : "text-red-600";
+                          const gradeBg = student.averageScore >= 90 ? "bg-green-500/10" :
+                                         student.averageScore >= 80 ? "bg-blue-500/10" :
+                                         student.averageScore >= 70 ? "bg-yellow-500/10" :
+                                         student.averageScore >= 60 ? "bg-orange-500/10" : "bg-red-500/10";
+
+                          return (
+                            <Button
+                              key={student.studentId}
+                              variant="outline"
+                              className="w-full justify-start p-4 h-auto hover-elevate"
+                              onClick={() => setSelectedStudent(student)}
+                            >
+                              <div className="flex items-center gap-4 w-full">
+                                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 font-bold text-primary flex-shrink-0">
+                                  {index + 1}
+                                </div>
+                                <div className="flex-1 grid md:grid-cols-4 gap-4 text-left">
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">이름</p>
+                                    <p className="font-semibold">{student.studentName}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">학생 ID</p>
+                                    <p className="font-mono text-sm">{student.studentId}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">응시 횟수</p>
+                                    <p className="font-semibold">{student.totalTests}회</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">평균 성취율</p>
+                                    <Badge className={`${gradeBg} ${gradeColor} font-mono text-base`}>
+                                      {student.averageScore}%
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </div>
+                            </Button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* 선택된 학생의 상세 성적 */}
+              {selectedStudent && (
+                <>
+                  <Card className="shadow-lg border-2 border-primary/30">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-2xl mb-2">{selectedStudent.studentName} 학생 성적표</CardTitle>
+                          <CardDescription className="flex items-center gap-4">
+                            <span>학생 ID: {selectedStudent.studentId}</span>
+                            <span>총 {selectedStudentResults.length}회 응시</span>
+                            <Badge className="text-base">평균 {selectedStudentAvg}%</Badge>
+                          </CardDescription>
+                        </div>
+                        <Button
+                          variant="outline"
+                          onClick={() => setSelectedStudent(null)}
+                        >
+                          목록으로
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {selectedStudentResults.length === 0 ? (
+                          <p className="text-center text-muted-foreground py-8">
+                            응시 기록이 없습니다
+                          </p>
+                        ) : (
+                          selectedStudentResults.map((result, index) => {
+                            const gradeColor = result.achievementRate >= 90 ? "text-green-600" :
+                                              result.achievementRate >= 80 ? "text-blue-600" :
+                                              result.achievementRate >= 70 ? "text-yellow-600" :
+                                              result.achievementRate >= 60 ? "text-orange-600" : "text-red-600";
+                            const gradeBg = result.achievementRate >= 90 ? "bg-green-500/10" :
+                                           result.achievementRate >= 80 ? "bg-blue-500/10" :
+                                           result.achievementRate >= 70 ? "bg-yellow-500/10" :
+                                           result.achievementRate >= 60 ? "bg-orange-500/10" : "bg-red-500/10";
+
+                            return (
+                              <div
+                                key={index}
+                                className={`flex items-center gap-4 p-5 rounded-xl border-2 ${gradeBg}`}
+                              >
+                                <div className={`w-16 h-16 rounded-full flex items-center justify-center ${gradeBg} border-2`}>
+                                  <span className={`text-2xl font-bold ${gradeColor}`}>
+                                    {result.achievementRate}
+                                  </span>
+                                </div>
+                                <div className="flex-1 grid md:grid-cols-3 gap-4">
+                                  <div>
+                                    <p className="text-sm text-muted-foreground mb-1">단원</p>
+                                    <p className="font-bold">{result.unit}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-muted-foreground mb-1">응시 일시</p>
+                                    <p className="text-sm flex items-center gap-1">
+                                      <Calendar className="w-3 h-3" />
+                                      {result.submittedAt}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-muted-foreground mb-1">피드백</p>
+                                    <p className="text-sm">{result.feedback}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
             </TabsContent>
 
             {/* 단원별 오답 분석 */}
@@ -231,7 +360,7 @@ export default function AdminPage() {
                 <CardHeader>
                   <CardTitle>단원 선택</CardTitle>
                   <CardDescription>
-                    분석할 단원을 선택하세요
+                    분석할 단원을 선택하세요 (데이터베이스 기반)
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
