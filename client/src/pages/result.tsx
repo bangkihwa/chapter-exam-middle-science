@@ -21,6 +21,8 @@ interface ResultData {
     isCorrect: boolean;
   }>;
   unit: string;
+  sheetWriteSuccess?: boolean;
+  sheetError?: string | null;
 }
 
 export default function ResultPage() {
@@ -118,6 +120,54 @@ export default function ResultPage() {
     <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="space-y-6">
+          {/* 구글 시트 저장 상태 알림 */}
+          {result.sheetWriteSuccess === false && result.sheetError && (
+            <Card className="border-2 border-red-500/50 bg-red-500/10">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-1" />
+                  <div className="flex-1">
+                    <h3 className="font-bold text-lg text-red-700 mb-1">
+                      ⚠️ 구글 시트 저장 실패
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      시험 결과는 시스템에 저장되었지만, 구글 시트에 동기화되지 않았습니다.
+                    </p>
+                    <details className="mt-2">
+                      <summary className="text-sm font-medium text-red-600 cursor-pointer hover:underline">
+                        오류 상세 보기
+                      </summary>
+                      <pre className="mt-2 p-3 bg-red-950/20 rounded text-xs overflow-auto">
+                        {result.sheetError}
+                      </pre>
+                    </details>
+                    <p className="text-xs text-muted-foreground mt-3">
+                      💡 관리자 분석 기능은 구글 시트 데이터를 사용합니다. 선생님께 문의하세요.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
+          {result.sheetWriteSuccess === true && (
+            <Card className="border-2 border-green-500/50 bg-green-500/10">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="w-6 h-6 text-green-600 flex-shrink-0" />
+                  <div className="flex-1">
+                    <h3 className="font-bold text-lg text-green-700">
+                      ✅ 구글 시트 저장 완료
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      시험 결과가 성공적으로 구글 시트에 기록되었습니다.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* 성적 요약 카드 */}
           <Card className={`border-2 shadow-2xl ${gradeInfo.borderColor}`}>
             <CardHeader className="text-center space-y-6 pb-8">

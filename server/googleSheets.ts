@@ -73,7 +73,10 @@ export async function writeResultToSheet(spreadsheetId: string, result: any) {
     const sheets = await getUncachableGoogleSheetClient();
     const timestamp = new Date(result.submittedAt).toLocaleString('ko-KR');
     
+    console.log(`[Google Sheets] Writing result for ${result.studentId} (${result.unit})`);
+    
     // 1. 시험결과 탭에 요약 저장
+    console.log(`[Google Sheets] Writing summary to 시험결과 tab...`);
     await sheets.spreadsheets.values.append({
       spreadsheetId,
       range: '시험결과!A:G',
@@ -90,12 +93,17 @@ export async function writeResultToSheet(spreadsheetId: string, result: any) {
         ]],
       },
     });
+    console.log(`[Google Sheets] ✓ Summary written successfully`);
 
     // 2. 문항응답 탭 확인 및 생성
+    console.log(`[Google Sheets] Ensuring 문항응답 tab exists...`);
     await ensureSheetExists(spreadsheetId, '문항응답');
+    console.log(`[Google Sheets] ✓ 문항응답 tab ready`);
 
     // 3. 문항응답 탭에 각 문제별 답안 저장
     const studentAnswers = JSON.parse(result.answers);
+    console.log(`[Google Sheets] Parsing ${studentAnswers.length} student answers...`);
+    
     const questionRows = studentAnswers.map((ans: any) => [
       `${result.studentId}_${timestamp}`, // submissionId
       result.studentId,
@@ -107,7 +115,8 @@ export async function writeResultToSheet(spreadsheetId: string, result: any) {
     ]);
 
     if (questionRows.length > 0) {
-      await sheets.spreadsheets.values.append({
+      console.log(`[Google Sheets] Writing ${questionRows.length} question responses to 문항응답...`);
+      const appendResult = await sheets.spreadsheets.values.append({
         spreadsheetId,
         range: "'문항응답'!A:G", // submissionId, 학생ID, 학생이름, 단원, 문제번호, 학생답안, 응시일시
         valueInputOption: 'USER_ENTERED',
@@ -115,12 +124,17 @@ export async function writeResultToSheet(spreadsheetId: string, result: any) {
           values: questionRows,
         },
       });
+      console.log(`[Google Sheets] ✓ Question responses written: ${appendResult.data.updates?.updatedRows || 0} rows`);
+    } else {
+      console.warn(`[Google Sheets] ⚠ No question answers to write!`);
     }
 
+    console.log(`[Google Sheets] ✅ All data written successfully for ${result.studentId}`);
     return true;
-  } catch (error) {
-    console.error('Error writing result to Google Sheets:', error);
-    return false;
+  } catch (error: any) {
+    console.error('❌ [Google Sheets] Error writing result:', error.message);
+    console.error('Full error:', error);
+    throw error; // Re-throw so caller knows it failed
   }
 }
 

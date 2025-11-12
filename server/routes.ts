@@ -129,10 +129,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Try to write to Google Sheets (optional, doesn't fail if unsuccessful)
       const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
+      let sheetWriteSuccess = false;
+      let sheetError = null;
+      
       if (spreadsheetId) {
-        await writeResultToSheet(spreadsheetId, result).catch(err => {
-          console.error('Failed to write to Google Sheets:', err);
-        });
+        try {
+          await writeResultToSheet(spreadsheetId, result);
+          sheetWriteSuccess = true;
+          console.log(`✅ Successfully wrote to Google Sheets for ${studentId}`);
+        } catch (err: any) {
+          sheetError = err.message;
+          console.error(`❌ Failed to write to Google Sheets for ${studentId}:`, err.message);
+        }
+      } else {
+        console.warn('⚠️ GOOGLE_SPREADSHEET_ID not configured - skipping sheet write');
       }
 
       return res.json({
@@ -143,6 +153,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         feedback,
         details,
         unit,
+        sheetWriteSuccess,
+        sheetError,
       });
     } catch (error: any) {
       return res.status(400).json({
