@@ -290,6 +290,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin API endpoints
+  const ADMIN_PASSWORD = "3721";
+
+  // Admin login
+  app.post("/api/admin/login", async (req, res) => {
+    try {
+      const { password } = req.body;
+      if (password === ADMIN_PASSWORD) {
+        return res.json({ success: true });
+      } else {
+        return res.status(401).json({ success: false, message: "비밀번호가 올바르지 않습니다." });
+      }
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get all test results (admin only)
+  app.get("/api/admin/all-results", async (req, res) => {
+    try {
+      const allResults = await storage.getAllTestResults();
+      return res.json(allResults);
+    } catch (error: any) {
+      return res.status(500).json({
+        message: error.message || "성적 데이터를 불러오는 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
+  // Get unit statistics with wrong answer analysis (admin only)
+  app.get("/api/admin/unit-stats/:unit", async (req, res) => {
+    try {
+      const { unit } = req.params;
+      const decodedUnit = decodeURIComponent(unit);
+      
+      // Get all questions for this unit
+      const questions = await storage.getQuestionsByUnit(decodedUnit);
+      const multipleChoiceQuestions = questions.filter(q => q.type === "객관식");
+      
+      // Get all test results for this unit
+      const allResults = await storage.getAllTestResults();
+      const unitResults = allResults.filter(r => r.unit === decodedUnit);
+      
+      // Analyze each question
+      const questionStats = multipleChoiceQuestions.map(question => {
+        const stats = {
+          questionId: question.questionId,
+          correctAnswer: question.answer,
+          totalAttempts: 0,
+          wrongAttempts: 0,
+          answerDistribution: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 } as Record<string, number>,
+          wrongRate: 0,
+        };
+
+        // Analyze each student's answer
+        unitResults.forEach(result => {
+          try {
+            const studentAnswers = JSON.parse(result.answers);
+            const studentAnswer = studentAnswers.find((a: any) => a.questionId === question.questionId);
+            
+            if (studentAnswer && studentAnswer.answer) {
+              stats.totalAttempts++;
+              stats.answerDistribution[studentAnswer.answer] = (stats.answerDistribution[studentAnswer.answer] || 0) + 1;
+              
+              if (studentAnswer.answer !== question.answer) {
+                stats.wrongAttempts++;
+              }
+            }
+          } catch (e) {
+            // Skip invalid JSON
+          }
+        });
+
+        stats.wrongRate = stats.totalAttempts > 0 
+          ? Math.round((stats.wrongAttempts / stats.totalAttempts) * 100)
+          : 0;
+
+        return stats;
+      });
+
+      // Sort by wrong rate (highest first)
+      questionStats.sort((a, b) => b.wrongRate - a.wrongRate);
+
+      return res.json({
+        unit: decodedUnit,
+        totalQuestions: multipleChoiceQuestions.length,
+        totalStudents: unitResults.length,
+        questionStats,
+      });
+    } catch (error: any) {
+      return res.status(500).json({
+        message: error.message || "통계 데이터를 불러오는 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
+  // Get all students (admin only)
+  app.get("/api/admin/students", async (req, res) => {
+    try {
+      const students = await storage.getAllStudents();
+      return res.json(students);
+    } catch (error: any) {
+      return res.status(500).json({
+        message: error.message || "학생 데이터를 불러오는 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

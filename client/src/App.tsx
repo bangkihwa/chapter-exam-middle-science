@@ -8,6 +8,8 @@ import UnitsPage from "@/pages/units";
 import TestPage from "@/pages/test";
 import ResultPage from "@/pages/result";
 import ReportsPage from "@/pages/reports";
+import AdminLoginPage from "@/pages/admin-login";
+import AdminPage from "@/pages/admin";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -18,6 +20,8 @@ function Router() {
       <Route path="/test/:unit" component={TestPage} />
       <Route path="/result" component={ResultPage} />
       <Route path="/reports" component={ReportsPage} />
+      <Route path="/admin/login" component={AdminLoginPage} />
+      <Route path="/admin" component={AdminPage} />
       <Route component={NotFound} />
     </Switch>
   );
