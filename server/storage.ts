@@ -5,6 +5,7 @@ import { eq, and, desc } from "drizzle-orm";
 export interface IStorage {
   // Student operations
   getStudentByCredentials(studentId: string, studentName: string): Promise<Student | undefined>;
+  getStudentById(studentId: string): Promise<Student | undefined>;
   getAllStudents(): Promise<Student[]>;
   createStudent(student: InsertStudent): Promise<Student>;
   
@@ -28,6 +29,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(students)
       .where(and(eq(students.studentId, studentId), eq(students.studentName, studentName)));
+    return student || undefined;
+  }
+
+  async getStudentById(studentId: string): Promise<Student | undefined> {
+    const [student] = await db
+      .select()
+      .from(students)
+      .where(eq(students.studentId, studentId));
     return student || undefined;
   }
 

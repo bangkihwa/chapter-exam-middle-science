@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { loginSchema, submitTestSchema, TEXTBOOK_NAME, units } from "@shared/schema";
-import { writeResultToSheet } from "./googleSheets";
+import { writeResultToSheet, readStudentsFromSheet } from "./googleSheets";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Login endpoint
@@ -160,6 +160,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       return res.status(500).json({
         message: error.message || "성적을 불러오는 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
+  // Sync students from Google Sheets
+  app.post("/api/sync-students", async (req, res) => {
+    try {
+      const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
+      if (!spreadsheetId) {
+        return res.status(400).json({
+          message: "GOOGLE_SPREADSHEET_ID가 설정되지 않았습니다.",
+        });
+      }
+
+      const studentsFromSheet = await readStudentsFromSheet(spreadsheetId);
+      
+      if (studentsFromSheet.length === 0) {
+        return res.json({
+          message: "구글 시트에서 학생 정보를 찾을 수 없습니다.",
+          added: 0,
+          skipped: 0,
+        });
+      }
+
+      let added = 0;
+      let skipped = 0;
+
+      for (const student of studentsFromSheet) {
+        if (!student.studentId || !student.studentName) {
+          skipped++;
+          continue;
+        }
+
+        const existing = await storage.getStudentById(student.studentId);
+        if (!existing) {
+          await storage.createStudent({
+            studentId: student.studentId,
+            studentName: student.studentName,
+            grade: student.grade || '',
+            phone: student.phone || '',
+          });
+          added++;
+        } else {
+          skipped++;
+        }
+      }
+
+      return res.json({
+        message: `구글 시트 동기화 완료: ${added}명 추가, ${skipped}명 건너뜀`,
+        added,
+        skipped,
+        total: studentsFromSheet.length,
+      });
+    } catch (error: any) {
+      console.error('Sync students error:', error);
+      return res.status(500).json({
+        message: error.message || "학생 동기화 중 오류가 발생했습니다.",
       });
     }
   });
