@@ -164,7 +164,7 @@ export default function TestPage() {
                       {leftQuestion && (
                         <div className="flex items-center gap-4">
                           <div className="font-bold text-lg min-w-[4rem]">
-                            {leftIndex + 1}번
+                            {leftQuestion.questionId}번
                           </div>
                           <div className="flex gap-2">
                             {[1, 2, 3, 4, 5].map((option) => (
@@ -176,7 +176,7 @@ export default function TestPage() {
                                     ? "bg-primary text-primary-foreground border-primary"
                                     : "border-border hover:border-primary/50"
                                 }`}
-                                data-testid={`answer-${leftIndex}-${option}`}
+                                data-testid={`answer-${leftQuestion.questionId}-${option}`}
                               >
                                 {option}
                               </button>
@@ -188,7 +188,7 @@ export default function TestPage() {
                       {rightQuestion && (
                         <div className="flex items-center gap-4">
                           <div className="font-bold text-lg min-w-[4rem]">
-                            {rightIndex + 1}번
+                            {rightQuestion.questionId}번
                           </div>
                           <div className="flex gap-2">
                             {[1, 2, 3, 4, 5].map((option) => (
@@ -200,7 +200,7 @@ export default function TestPage() {
                                     ? "bg-primary text-primary-foreground border-primary"
                                     : "border-border hover:border-primary/50"
                                 }`}
-                                data-testid={`answer-${rightIndex}-${option}`}
+                                data-testid={`answer-${rightQuestion.questionId}-${option}`}
                               >
                                 {option}
                               </button>
