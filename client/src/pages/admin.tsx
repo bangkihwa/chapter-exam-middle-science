@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ShieldCheck, Users, BarChart3, AlertCircle, TrendingDown, LogOut, Search, Calendar, RefreshCw, Settings2, Link as LinkIcon } from "lucide-react";
+import { ShieldCheck, Users, BarChart3, AlertCircle, TrendingDown, LogOut, Search, Calendar, RefreshCw, Settings2, Link as LinkIcon, Database } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import type { Student, TestResult } from "@shared/schema";
 import { units } from "@shared/schema";
@@ -129,6 +129,30 @@ export default function AdminPage() {
     },
   });
 
+  const initDataMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest<{ message: string; questionCount: number }>(
+        "POST",
+        "/api/init-data",
+        {}
+      );
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "초기화 완료",
+        description: `${data.questionCount}개의 문제가 데이터베이스에 저장되었습니다.`,
+        variant: "default",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "초기화 실패",
+        description: error.message || "문제 데이터를 초기화하는 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleLogout = () => {
     sessionStorage.removeItem("admin");
     setLocation("/admin/login");
@@ -136,6 +160,10 @@ export default function AdminPage() {
 
   const handleSyncStudents = () => {
     syncStudentsMutation.mutate();
+  };
+
+  const handleInitData = () => {
+    initDataMutation.mutate();
   };
 
   const handleSaveSpreadsheetId = () => {
@@ -620,6 +648,59 @@ export default function AdminPage() {
                       <li>상단의 <strong className="text-foreground">"학생 동기화"</strong> 버튼을 클릭하세요</li>
                       <li>구글 시트의 학생 정보가 데이터베이스로 복사됩니다</li>
                       <li>학생들이 로그인할 수 있습니다!</li>
+                    </ol>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-lg border-2 border-orange-500/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Database className="w-6 h-6" />
+                    문제 데이터 초기화
+                  </CardTitle>
+                  <CardDescription>
+                    데이터베이스에 물리학 프리미엄 16개 단원의 모든 문제를 저장합니다
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+                    <p className="text-sm font-medium mb-2">⚠️ 언제 사용하나요?</p>
+                    <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                      <li>배포 직후 데이터베이스가 비어있을 때</li>
+                      <li>학생들이 시험을 볼 수 없다고 할 때</li>
+                      <li>"문제를 불러올 수 없습니다" 오류가 발생할 때</li>
+                    </ul>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleInitData}
+                      disabled={initDataMutation.isPending}
+                      variant="default"
+                      className="flex-1"
+                      data-testid="button-init-data"
+                    >
+                      <Database className={`w-4 h-4 mr-2 ${initDataMutation.isPending ? 'animate-pulse' : ''}`} />
+                      {initDataMutation.isPending ? "초기화 중..." : "문제 데이터 초기화"}
+                    </Button>
+                  </div>
+
+                  <div className="pt-4 border-t space-y-2">
+                    <h4 className="font-semibold">📝 초기화 내용:</h4>
+                    <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                      <li>16개 단원의 모든 객관식/주관식 문제</li>
+                      <li>각 문제의 정답 및 메타데이터</li>
+                      <li>총 960개의 문제 데이터</li>
+                    </ul>
+                  </div>
+
+                  <div className="pt-4 border-t space-y-2">
+                    <h4 className="font-semibold">✅ 초기화 완료 후:</h4>
+                    <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
+                      <li>학생들이 모든 단원의 시험을 볼 수 있습니다</li>
+                      <li>OMR 답안 입력 화면이 정상 표시됩니다</li>
+                      <li>즉시 채점 및 성적 분석이 가능합니다</li>
                     </ol>
                   </div>
                 </CardContent>
