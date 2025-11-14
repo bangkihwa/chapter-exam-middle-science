@@ -294,10 +294,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fs = await import('fs');
       const path = await import('path');
       
-      // Parse both files
+      // Parse all exam files (excluding duplicates)
       const files = [
-        'Pasted--cite--1763097329757_1763097329758.txt',
-        'Pasted---1763098921528_1763098921529.txt',
+        'Pasted--cite--1763097329757_1763097329758.txt',  // 목동 기출
+        'Pasted---1763098921528_1763098921529.txt',       // 강서양천 2023-2학기 기말
+        'Pasted--cite--1763100057184_1763100057185.txt',  // 2024-2학기 중간 (NEW)
       ];
 
       let combinedResult: Record<string, Record<string, any[]>> = {};
