@@ -2,7 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { loginSchema, submitTestSchema, type UnitResult } from "@shared/schema";
-import { readExamDataFromSheet, writeExamDataToSheet } from "./googleSheets";
+import { readExamDataFromSheet, writeExamDataToSheet, writeStudentResultToSheet } from "./googleSheets";
+
+const SPREADSHEET_ID = "1Mi70D_RLWqSCqmlCl2t_yUfdiByF1ExXkLrn7SQcv7k";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Login endpoint
@@ -217,6 +219,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         achievementRate,
         unitResults: JSON.stringify(unitResults),
       });
+
+      // Write result to Google Sheets (시트2, 시트3)
+      try {
+        await writeStudentResultToSheet(SPREADSHEET_ID, {
+          studentId,
+          studentName,
+          exam,
+          score,
+          achievementRate,
+          unitResults,
+          submittedAt: submission.submittedAt,
+        });
+      } catch (sheetError) {
+        console.error('Failed to write to Google Sheets:', sheetError);
+        // Continue even if Google Sheets fails
+      }
 
       return res.json({
         submissionId: submission.id,

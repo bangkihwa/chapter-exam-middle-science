@@ -357,7 +357,7 @@ export async function readExamDataFromSheet(spreadsheetId: string) {
     
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'Sheet1!A2:H',
+      range: '기출문제!A2:H',
     });
 
     const rows = response.data.values || [];
@@ -384,10 +384,13 @@ export async function writeExamDataToSheet(spreadsheetId: string, examData: any[
   try {
     const sheets = await getUncachableGoogleSheetClient();
     
+    // Ensure "기출문제" sheet exists
+    await ensureSheetExists(spreadsheetId, '기출문제');
+    
     // Clear existing data first
     await sheets.spreadsheets.values.clear({
       spreadsheetId,
-      range: 'Sheet1!A:H',
+      range: '기출문제!A:H',
     });
 
     // Prepare header
@@ -408,17 +411,116 @@ export async function writeExamDataToSheet(spreadsheetId: string, examData: any[
     // Write data
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: 'Sheet1!A1:H',
+      range: '기출문제!A1:H',
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [header, ...rows],
       },
     });
 
-    console.log(`✅ Wrote ${rows.length} questions to Google Sheets`);
+    console.log(`✅ Wrote ${rows.length} questions to Google Sheets (기출문제 tab)`);
     return true;
   } catch (error) {
     console.error('Error writing exam data to Google Sheets:', error);
+    throw error;
+  }
+}
+
+export async function writeStudentResultToSheet(spreadsheetId: string, result: any) {
+  try {
+    const sheets = await getUncachableGoogleSheetClient();
+    
+    // Ensure sheets exist
+    await ensureSheetExists(spreadsheetId, '시트2');
+    await ensureSheetExists(spreadsheetId, '시트3');
+    
+    const timestamp = new Date(result.submittedAt).toLocaleString('ko-KR');
+    
+    // 시트2: 학생용 요약 결과
+    const sheet2Header = ['학생ID', '이름', '학교', '시험', '점수', '성취도', '제출일시'];
+    
+    // Check if header exists, if not add it
+    const sheet2Data = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: '시트2!A1:G1',
+    });
+    
+    if (!sheet2Data.data.values || sheet2Data.data.values.length === 0) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: '시트2!A1:G1',
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+          values: [sheet2Header],
+        },
+      });
+    }
+    
+    // Append student result to 시트2
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: '시트2!A:G',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [[
+          result.studentId,
+          result.studentName,
+          result.exam.schoolName,
+          `${result.exam.year}년 ${result.exam.semester}`,
+          `${result.score}점`,
+          `${result.achievementRate}%`,
+          timestamp,
+        ]],
+      },
+    });
+    
+    // 시트3: 상세 분석 (단원별)
+    const sheet3Header = ['학생ID', '이름', '시험', '단원', '정답수', '오답수', '미응시', '성취도', '제출일시'];
+    
+    const sheet3Data = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: '시트3!A1:I1',
+    });
+    
+    if (!sheet3Data.data.values || sheet3Data.data.values.length === 0) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: '시트3!A1:I1',
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+          values: [sheet3Header],
+        },
+      });
+    }
+    
+    // Append unit results to 시트3
+    const unitRows = result.unitResults.map((unit: any) => [
+      result.studentId,
+      result.studentName,
+      `${result.exam.year}년 ${result.exam.semester}`,
+      unit.unit,
+      unit.correct,
+      unit.wrong,
+      unit.unanswered,
+      `${unit.achievementRate}%`,
+      timestamp,
+    ]);
+    
+    if (unitRows.length > 0) {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: '시트3!A:I',
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+          values: unitRows,
+        },
+      });
+    }
+    
+    console.log(`✅ Wrote student result to Google Sheets (시트2, 시트3)`);
+    return true;
+  } catch (error) {
+    console.error('Error writing student result to Google Sheets:', error);
     throw error;
   }
 }
