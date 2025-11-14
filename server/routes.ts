@@ -261,7 +261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Initialize data from attached file
+  // Initialize data from attached files
   app.post("/api/init-data", async (req, res) => {
     try {
       const existingSchools = await storage.getAllSchools();
@@ -275,19 +275,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fs = await import('fs');
       const path = await import('path');
       
-      const filePath = path.join(process.cwd(), 'attached_assets', 'Pasted--cite--1763097329757_1763097329758.txt');
-      
-      if (!fs.existsSync(filePath)) {
-        return res.status(404).json({
-          message: "기출문제 파일을 찾을 수 없습니다.",
-        });
+      // Parse both files
+      const files = [
+        'Pasted--cite--1763097329757_1763097329758.txt',
+        'Pasted---1763098921528_1763098921529.txt',
+      ];
+
+      let combinedResult: Record<string, Record<string, any[]>> = {};
+
+      for (const fileName of files) {
+        const filePath = path.join(process.cwd(), 'attached_assets', fileName);
+        
+        if (!fs.existsSync(filePath)) {
+          console.log(`파일을 찾을 수 없습니다: ${fileName}`);
+          continue;
+        }
+
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const result = parseExamData(content);
+
+        // Merge results
+        for (const [schoolName, examData] of Object.entries(result)) {
+          if (!combinedResult[schoolName]) {
+            combinedResult[schoolName] = {};
+          }
+          for (const [examKey, examQuestions] of Object.entries(examData)) {
+            if (!combinedResult[schoolName][examKey]) {
+              combinedResult[schoolName][examKey] = [];
+            }
+            combinedResult[schoolName][examKey].push(...examQuestions);
+          }
+        }
       }
 
-      const content = fs.readFileSync(filePath, 'utf-8');
-      const result = parseExamData(content);
-
       // Create schools and exams
-      for (const [schoolName, examData] of Object.entries(result)) {
+      for (const [schoolName, examData] of Object.entries(combinedResult)) {
         const school = await storage.createSchool({ name: schoolName });
         
         for (const [examKey, examQuestions] of Object.entries(examData)) {
