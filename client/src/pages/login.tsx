@@ -34,7 +34,7 @@ export default function LoginPage() {
           title: "로그인 성공",
           description: `${data.student.studentName}님, 환영합니다!`,
         });
-        setLocation("/units");
+        setLocation("/schools");
       }
     },
     onError: (error: any) => {
@@ -73,7 +73,7 @@ export default function LoginPage() {
           <div className="space-y-2">
             <CardTitle className="text-3xl font-bold">목동에이원과학학원</CardTitle>
             <CardDescription className="text-base">
-              물리학 프리미엄 OMR 채점 시스템
+              통합과학 기출문제 채점 시스템
             </CardDescription>
           </div>
         </CardHeader>

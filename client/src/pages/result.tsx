@@ -4,25 +4,27 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle2, XCircle, Home, BarChart3, Trophy, Target, TrendingUp, AlertCircle, Sparkles } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CheckCircle2, XCircle, Home, BarChart3, Trophy, Target, GraduationCap, User } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import type { UnitResult } from "@shared/schema";
 
 interface ResultData {
+  submissionId: number;
   score: number;
   totalQuestions: number;
+  answeredQuestions: number;
   correctAnswers: number;
   achievementRate: number;
-  feedback: string;
+  unitResults: UnitResult[];
   details: Array<{
-    questionId: string;
+    questionNumber: number;
     studentAnswer: string;
     correctAnswer: string;
     isCorrect: boolean;
+    isMultipleAnswer: boolean;
   }>;
-  unit: string;
-  sheetWriteSuccess?: boolean;
-  sheetError?: string | null;
 }
 
 export default function ResultPage() {
@@ -32,7 +34,7 @@ export default function ResultPage() {
   useEffect(() => {
     const resultData = sessionStorage.getItem("testResult");
     if (!resultData) {
-      setLocation("/units");
+      setLocation("/schools");
       return;
     }
     setResult(JSON.parse(resultData));
@@ -43,9 +45,9 @@ export default function ResultPage() {
   }
 
   const isPerfect = result.correctAnswers === result.totalQuestions;
-  const incorrectAnswers = result.totalQuestions - result.correctAnswers;
+  const incorrectAnswers = result.answeredQuestions - result.correctAnswers;
+  const unansweredQuestions = result.totalQuestions - result.answeredQuestions;
   
-  // 성적 등급 결정
   const getGrade = (rate: number) => {
     if (rate === 100) return { grade: "S", color: "text-yellow-600", bgColor: "bg-yellow-500/20", borderColor: "border-yellow-500" };
     if (rate >= 90) return { grade: "A+", color: "text-green-600", bgColor: "bg-green-500/20", borderColor: "border-green-500" };
@@ -58,339 +60,327 @@ export default function ResultPage() {
 
   const gradeInfo = getGrade(result.achievementRate);
 
-  // 동적 피드백 메시지
-  const getDetailedFeedback = (rate: number, correct: number, total: number) => {
+  const getStudentFeedback = (rate: number, correct: number, total: number, answered: number) => {
     if (rate === 100) {
       return {
-        title: "🎉 완벽한 성적입니다!",
-        message: `${total}문제를 모두 맞히셨습니다! 뛰어난 이해력과 집중력을 보여주셨어요.`,
-        tips: ["이 수준을 유지하며 다음 단원도 도전해보세요!", "완벽한 실력입니다. 자신감을 가지세요!"]
+        title: "완벽합니다!",
+        message: `${total}문제를 모두 맞히셨습니다! 훌륭한 성적입니다.`,
+        tips: ["이 실력을 유지하며 다음 시험도 도전해보세요!", "완벽한 이해도를 보여주셨어요!"]
       };
     } else if (rate >= 90) {
       return {
-        title: "🌟 훌륭한 성적입니다!",
-        message: `${total}문제 중 ${correct}문제를 맞히셨습니다. 거의 완벽에 가까운 이해도를 보여주셨어요.`,
-        tips: [`틀린 ${incorrectAnswers}문제만 복습하면 완벽해질 수 있어요!`, "이 단원은 거의 마스터하셨습니다!"]
-      };
-    } else if (rate >= 80) {
-      return {
-        title: "👍 잘했습니다!",
-        message: `${total}문제 중 ${correct}문제를 맞히셨습니다. 핵심 개념을 잘 이해하고 계세요.`,
-        tips: [`틀린 ${incorrectAnswers}문제를 집중 복습해보세요.`, "조금만 더 노력하면 A+ 등급이에요!"]
+        title: "훌륭합니다!",
+        message: `${answered}문제 중 ${correct}문제를 맞히셨습니다. 거의 완벽한 성적이에요!`,
+        tips: ["틀린 문제만 복습하면 완벽해질 수 있어요!", "높은 성취도를 보여주셨습니다."]
       };
     } else if (rate >= 70) {
       return {
-        title: "📚 괜찮은 성적입니다!",
-        message: `${total}문제 중 ${correct}문제를 맞히셨습니다. 기본 개념은 잘 알고 계세요.`,
-        tips: [`틀린 ${incorrectAnswers}문제를 다시 풀어보세요.`, "개념을 한 번 더 정리하면 더 좋은 성적을 얻을 수 있어요!"]
+        title: "잘했습니다!",
+        message: `${answered}문제 중 ${correct}문제를 맞히셨습니다. 핵심 개념을 잘 이해하고 있어요.`,
+        tips: ["틀린 문제를 집중적으로 복습해보세요.", "조금만 더 노력하면 더 좋은 성적을 얻을 수 있어요!"]
       };
-    } else if (rate >= 60) {
+    } else if (rate >= 50) {
       return {
-        title: "💪 조금 더 노력이 필요해요!",
-        message: `${total}문제 중 ${correct}문제를 맞히셨습니다. 기초는 다졌지만 보완이 필요해요.`,
-        tips: ["교과서의 기본 개념을 다시 읽어보세요.", "틀린 문제 유형을 파악하고 집중 학습하세요."]
+        title: "괜찮습니다!",
+        message: `${answered}문제 중 ${correct}문제를 맞히셨습니다. 기본은 이해하고 있어요.`,
+        tips: ["틀린 문제를 다시 풀어보며 개념을 정리하세요.", "교과서를 한 번 더 읽어보면 도움이 될 거예요."]
       };
     } else {
       return {
-        title: "📖 기초부터 다시 시작해요!",
-        message: `${total}문제 중 ${correct}문제를 맞히셨습니다. 이 단원의 기본 개념을 다시 학습하세요.`,
-        tips: ["선생님께 질문하거나 개념 강의를 다시 들어보세요.", "천천히, 확실하게 기초부터 다시 쌓아가세요."]
+        title: "더 노력이 필요합니다!",
+        message: `${answered}문제 중 ${correct}문제를 맞히셨습니다. 기초부터 다시 학습하세요.`,
+        tips: ["선생님께 질문하고 개념을 확실히 이해하세요.", "천천히, 확실하게 기초부터 다시 학습하세요."]
       };
     }
   };
 
-  const feedbackData = getDetailedFeedback(result.achievementRate, result.correctAnswers, result.totalQuestions);
+  const getTeacherFeedback = (unitResults: UnitResult[], totalRate: number) => {
+    const weakUnits = unitResults.filter(u => u.achievementRate < 70 && u.total > 0);
+    const strongUnits = unitResults.filter(u => u.achievementRate >= 90 && u.total > 0);
+    
+    const recommendations = [];
+    
+    if (weakUnits.length > 0) {
+      recommendations.push({
+        type: "weak",
+        title: "보완이 필요한 단원",
+        units: weakUnits.map(u => `${u.unit} (${u.achievementRate}%)`),
+        action: "해당 단원의 기본 개념을 다시 설명하고 유사 문제를 풀어보세요."
+      });
+    }
+    
+    if (strongUnits.length > 0) {
+      recommendations.push({
+        type: "strong",
+        title: "잘 이해한 단원",
+        units: strongUnits.map(u => `${u.unit} (${u.achievementRate}%)`),
+        action: "이 단원들은 심화 문제로 실력을 더 키울 수 있습니다."
+      });
+    }
+    
+    if (unansweredQuestions > 0) {
+      recommendations.push({
+        type: "unanswered",
+        title: "미응답 문제",
+        units: [`${unansweredQuestions}개 문제 미응답`],
+        action: "시간 관리 능력을 향상시킬 필요가 있습니다."
+      });
+    }
+    
+    return recommendations;
+  };
 
-  // 파이 차트 데이터
-  const chartData = [
-    { name: "맞힌 문제", value: result.correctAnswers, color: "#10b981" },
-    { name: "틀린 문제", value: incorrectAnswers, color: "#ef4444" }
-  ];
+  const studentFeedback = getStudentFeedback(result.achievementRate, result.correctAnswers, result.totalQuestions, result.answeredQuestions);
+  const teacherRecommendations = getTeacherFeedback(result.unitResults, result.achievementRate);
 
-  // 틀린 문제 번호 목록
+  const chartData = result.unitResults.map(unit => ({
+    name: unit.unit,
+    정답률: unit.achievementRate,
+    맞힌문제: unit.correct,
+    틀린문제: unit.wrong,
+    미응답: unit.unanswered,
+  }));
+
   const wrongQuestions = result.details
-    ?.filter(d => !d.isCorrect)
-    .map(d => parseInt(d.questionId) || d.questionId)
-    .sort((a, b) => {
-      if (typeof a === 'number' && typeof b === 'number') return a - b;
-      return String(a).localeCompare(String(b));
-    }) || [];
+    .filter(d => !d.isCorrect && d.studentAnswer)
+    .map(d => d.questionNumber)
+    .sort((a, b) => a - b);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="space-y-6">
-          {/* 구글 시트 저장 상태 알림 */}
-          {result.sheetWriteSuccess === false && result.sheetError && (
-            <Card className="border-2 border-red-500/50 bg-red-500/10">
-              <CardContent className="pt-6">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-1" />
-                  <div className="flex-1">
-                    <h3 className="font-bold text-lg text-red-700 mb-1">
-                      ⚠️ 구글 시트 저장 실패
-                    </h3>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      시험 결과는 시스템에 저장되었지만, 구글 시트에 동기화되지 않았습니다.
-                    </p>
-                    <details className="mt-2">
-                      <summary className="text-sm font-medium text-red-600 cursor-pointer hover:underline">
-                        오류 상세 보기
-                      </summary>
-                      <pre className="mt-2 p-3 bg-red-950/20 rounded text-xs overflow-auto">
-                        {result.sheetError}
-                      </pre>
-                    </details>
-                    <p className="text-xs text-muted-foreground mt-3">
-                      💡 관리자 분석 기능은 구글 시트 데이터를 사용합니다. 선생님께 문의하세요.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-          
-          {result.sheetWriteSuccess === true && (
-            <Card className="border-2 border-green-500/50 bg-green-500/10">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="w-6 h-6 text-green-600 flex-shrink-0" />
-                  <div className="flex-1">
-                    <h3 className="font-bold text-lg text-green-700">
-                      ✅ 구글 시트 저장 완료
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      시험 결과가 성공적으로 구글 시트에 기록되었습니다.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* 성적 요약 카드 */}
           <Card className={`border-2 shadow-2xl ${gradeInfo.borderColor}`}>
             <CardHeader className="text-center space-y-6 pb-8">
               <div className="flex justify-center">
                 <div className={`w-32 h-32 rounded-full flex flex-col items-center justify-center ${gradeInfo.bgColor} border-4 ${gradeInfo.borderColor}`}>
-                  {isPerfect ? (
-                    <Sparkles className="w-16 h-16 text-yellow-600 mb-2" />
-                  ) : (
-                    <Trophy className="w-16 h-16 text-primary mb-2" />
-                  )}
+                  <Trophy className={`w-12 h-12 ${gradeInfo.color} mb-2`} />
                   <span className={`text-4xl font-bold ${gradeInfo.color}`}>
                     {gradeInfo.grade}
                   </span>
                 </div>
               </div>
               <div>
-                <CardTitle className="text-4xl font-bold mb-3">
-                  {feedbackData.title}
+                <CardTitle className="text-3xl font-bold mb-2">
+                  시험 결과
                 </CardTitle>
-                <p className="text-lg text-muted-foreground font-medium">
-                  {result.unit}
-                </p>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-8">
-              {/* 통계 그리드 */}
-              <div className="grid md:grid-cols-4 gap-4">
-                <div className="text-center p-6 rounded-xl bg-card border-2 hover-elevate">
-                  <Target className="w-8 h-8 mx-auto mb-2 text-primary" />
-                  <p className="text-sm text-muted-foreground mb-1">총 문제</p>
-                  <p className="text-4xl font-bold font-mono">{result.totalQuestions}</p>
-                </div>
-                <div className="text-center p-6 rounded-xl bg-green-500/10 border-2 border-green-500/30 hover-elevate">
-                  <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-green-600" />
-                  <p className="text-sm text-muted-foreground mb-1">맞힌 문제</p>
-                  <p className="text-4xl font-bold font-mono text-green-600">{result.correctAnswers}</p>
-                </div>
-                <div className="text-center p-6 rounded-xl bg-red-500/10 border-2 border-red-500/30 hover-elevate">
-                  <XCircle className="w-8 h-8 mx-auto mb-2 text-red-600" />
-                  <p className="text-sm text-muted-foreground mb-1">틀린 문제</p>
-                  <p className="text-4xl font-bold font-mono text-red-600">{incorrectAnswers}</p>
-                </div>
-                <div className={`text-center p-6 rounded-xl border-2 ${gradeInfo.bgColor} ${gradeInfo.borderColor} hover-elevate`}>
-                  <TrendingUp className={`w-8 h-8 mx-auto mb-2 ${gradeInfo.color}`} />
-                  <p className="text-sm text-muted-foreground mb-1">성취율</p>
-                  <p className={`text-4xl font-bold font-mono ${gradeInfo.color}`}>{result.achievementRate}%</p>
-                </div>
-              </div>
-
-              {/* 성취율 프로그레스 바 */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-lg">성취도</span>
-                  <Badge className={`text-lg px-4 py-1 ${gradeInfo.bgColor} ${gradeInfo.color}`}>
-                    {gradeInfo.grade} 등급
+                <div className="flex justify-center gap-4 text-lg">
+                  <Badge variant="outline" className="text-base font-mono">
+                    {result.achievementRate}점
+                  </Badge>
+                  <Badge variant="secondary" className="text-base">
+                    {result.correctAnswers} / {result.answeredQuestions} 정답
                   </Badge>
                 </div>
-                <Progress value={result.achievementRate} className="h-4" />
               </div>
+            </CardHeader>
 
-              {/* 피드백 메시지 */}
-              <div className={`p-6 rounded-xl ${gradeInfo.bgColor} border-2 ${gradeInfo.borderColor}`}>
-                <p className="font-semibold text-lg mb-3">{feedbackData.message}</p>
-                <Separator className="my-4" />
-                <div className="space-y-2">
-                  {feedbackData.tips.map((tip, idx) => (
-                    <div key={idx} className="flex items-start gap-3">
-                      <AlertCircle className={`w-5 h-5 mt-0.5 flex-shrink-0 ${gradeInfo.color}`} />
-                      <p className="text-sm text-muted-foreground">{tip}</p>
-                    </div>
-                  ))}
+            <CardContent className="space-y-8">
+              <div className="grid grid-cols-3 gap-6">
+                <div className="text-center p-6 bg-green-500/10 rounded-lg border-2 border-green-500/30">
+                  <CheckCircle2 className="w-10 h-10 text-green-600 mx-auto mb-3" />
+                  <div className="text-3xl font-bold text-green-600 mb-1">
+                    {result.correctAnswers}
+                  </div>
+                  <div className="text-sm text-muted-foreground">정답</div>
+                </div>
+
+                <div className="text-center p-6 bg-red-500/10 rounded-lg border-2 border-red-500/30">
+                  <XCircle className="w-10 h-10 text-red-600 mx-auto mb-3" />
+                  <div className="text-3xl font-bold text-red-600 mb-1">
+                    {incorrectAnswers}
+                  </div>
+                  <div className="text-sm text-muted-foreground">오답</div>
+                </div>
+
+                <div className="text-center p-6 bg-gray-500/10 rounded-lg border-2 border-gray-500/30">
+                  <Target className="w-10 h-10 text-gray-600 mx-auto mb-3" />
+                  <div className="text-3xl font-bold text-gray-600 mb-1">
+                    {unansweredQuestions}
+                  </div>
+                  <div className="text-sm text-muted-foreground">미응답</div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          {/* 시각화 및 분석 */}
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* 파이 차트 */}
-            <Card className="shadow-lg">
-              <CardHeader>
-                <CardTitle>정답 분포</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
-                    <Pie
-                      data={chartData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, value, percent }) => `${name}: ${value}문제 (${(percent * 100).toFixed(0)}%)`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            {/* 틀린 문제 분석 */}
-            <Card className="shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5 text-red-600" />
-                  복습이 필요한 문제
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {wrongQuestions.length > 0 ? (
-                  <div className="space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                      아래 문제들을 다시 풀어보고 개념을 복습하세요:
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {wrongQuestions.map((qId, idx) => (
-                        <Badge
-                          key={idx}
-                          variant="destructive"
-                          className="text-base px-3 py-1 font-mono"
-                        >
-                          {qId}번
-                        </Badge>
-                      ))}
-                    </div>
-                    <div className="mt-4 p-4 bg-red-500/10 rounded-lg border border-red-500/20">
-                      <p className="text-sm font-medium">
-                        💡 학습 팁: 틀린 문제는 교과서에서 해당 개념을 찾아 다시 읽고, 
-                        비슷한 유형의 문제를 더 풀어보세요!
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <CheckCircle2 className="w-16 h-16 mx-auto mb-4 text-green-600" />
-                    <p className="text-lg font-semibold text-green-600">
-                      모든 문제를 맞히셨습니다!
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      완벽한 이해도를 보여주셨어요! 🎉
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* 상세 결과 */}
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5" />
-                문제별 상세 결과
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                {result.details?.map((detail, index) => (
-                  <div
-                    key={detail.questionId}
-                    className={`p-4 rounded-lg border-2 text-center hover-elevate ${
-                      detail.isCorrect
-                        ? "bg-green-500/10 border-green-500/30"
-                        : "bg-red-500/10 border-red-500/30"
-                    }`}
-                    data-testid={`result-item-${index}`}
-                  >
-                    <div className="flex justify-center mb-2">
-                      {detail.isCorrect ? (
-                        <CheckCircle2 className="w-6 h-6 text-green-600" />
-                      ) : (
-                        <XCircle className="w-6 h-6 text-red-600" />
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      {detail.questionId}번
-                    </p>
-                    <div className="space-y-1">
-                      <Badge
-                        variant={detail.isCorrect ? "default" : "destructive"}
-                        className="font-mono text-xs"
-                      >
-                        내 답: {detail.studentAnswer}
-                      </Badge>
-                      {!detail.isCorrect && (
-                        <Badge
-                          variant="outline"
-                          className="font-mono text-xs border-green-600 text-green-700"
-                        >
-                          정답: {detail.correctAnswer}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                ))}
+              <div className="space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium">응답률</span>
+                  <span className="text-muted-foreground">
+                    {result.answeredQuestions} / {result.totalQuestions} ({Math.round((result.answeredQuestions / result.totalQuestions) * 100)}%)
+                  </span>
+                </div>
+                <Progress 
+                  value={(result.answeredQuestions / result.totalQuestions) * 100} 
+                  className="h-3" 
+                />
               </div>
+
+              {wrongQuestions.length > 0 && (
+                <div className="p-6 bg-red-500/10 rounded-lg border border-red-500/20">
+                  <h3 className="font-bold text-red-700 mb-3 flex items-center gap-2">
+                    <XCircle className="w-5 h-5" />
+                    틀린 문제 번호
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {wrongQuestions.map(q => (
+                      <Badge key={q} variant="destructive" className="text-base px-3 py-1">
+                        {q}번
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
-          {/* 버튼 */}
-          <div className="grid md:grid-cols-2 gap-4">
+          <Tabs defaultValue="student" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="student" data-testid="tab-student-feedback">
+                <User className="w-4 h-4 mr-2" />
+                학생용 피드백
+              </TabsTrigger>
+              <TabsTrigger value="teacher" data-testid="tab-teacher-feedback">
+                <GraduationCap className="w-4 h-4 mr-2" />
+                선생님용 분석
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="student" className="space-y-6 mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    {studentFeedback.title}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-lg">{studentFeedback.message}</p>
+                  <Separator />
+                  <div className="space-y-2">
+                    <h4 className="font-semibold">학습 조언</h4>
+                    <ul className="space-y-2">
+                      {studentFeedback.tips.map((tip, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-primary">•</span>
+                          <span>{tip}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>단원별 성취도</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="정답률" fill="#10b981" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="teacher" className="space-y-6 mt-6">
+              {teacherRecommendations.map((rec, i) => (
+                <Card key={i}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      {rec.type === "weak" && <XCircle className="w-5 h-5 text-red-600" />}
+                      {rec.type === "strong" && <CheckCircle2 className="w-5 h-5 text-green-600" />}
+                      {rec.type === "unanswered" && <Target className="w-5 h-5 text-gray-600" />}
+                      {rec.title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      {rec.units.map((unit, j) => (
+                        <Badge 
+                          key={j} 
+                          variant={rec.type === "weak" ? "destructive" : "default"}
+                          className="text-sm"
+                        >
+                          {unit}
+                        </Badge>
+                      ))}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>지도 방안:</strong> {rec.action}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>단원별 상세 분석</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {result.unitResults.map((unit, i) => (
+                      <div key={i} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">{unit.category}</Badge>
+                            <span className="font-medium">{unit.unit}</span>
+                          </div>
+                          <Badge variant={unit.achievementRate >= 70 ? "default" : "destructive"}>
+                            {unit.achievementRate}%
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-4 gap-2 text-sm">
+                          <div className="text-center p-2 bg-gray-100 dark:bg-gray-800 rounded">
+                            <div className="font-medium">{unit.total}</div>
+                            <div className="text-xs text-muted-foreground">총문항</div>
+                          </div>
+                          <div className="text-center p-2 bg-green-100 dark:bg-green-900/30 rounded">
+                            <div className="font-medium text-green-700 dark:text-green-400">{unit.correct}</div>
+                            <div className="text-xs text-muted-foreground">정답</div>
+                          </div>
+                          <div className="text-center p-2 bg-red-100 dark:bg-red-900/30 rounded">
+                            <div className="font-medium text-red-700 dark:text-red-400">{unit.wrong}</div>
+                            <div className="text-xs text-muted-foreground">오답</div>
+                          </div>
+                          <div className="text-center p-2 bg-gray-100 dark:bg-gray-800 rounded">
+                            <div className="font-medium">{unit.unanswered}</div>
+                            <div className="text-xs text-muted-foreground">미응답</div>
+                          </div>
+                        </div>
+                        <Progress value={unit.achievementRate} className="h-2" />
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+
+          <div className="flex justify-center gap-4">
             <Button
               variant="outline"
               size="lg"
-              onClick={() => setLocation("/units")}
-              data-testid="button-home"
+              onClick={() => setLocation("/reports")}
+              data-testid="button-view-reports"
             >
-              <Home className="w-5 h-5 mr-2" />
-              다른 단원 선택
+              <BarChart3 className="w-5 h-5 mr-2" />
+              성적 기록 보기
             </Button>
             <Button
               size="lg"
-              onClick={() => setLocation("/reports")}
-              data-testid="button-reports"
+              onClick={() => setLocation("/schools")}
+              data-testid="button-home"
             >
-              <BarChart3 className="w-5 h-5 mr-2" />
-              전체 성적표 보기
+              <Home className="w-5 h-5 mr-2" />
+              학교 선택으로
             </Button>
           </div>
         </div>

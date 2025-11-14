@@ -1,25 +1,55 @@
-import { students, questions, testResults, settings, type Student, type InsertStudent, type Question, type InsertQuestion, type TestResult, type InsertTestResult, type Setting, type InsertSetting } from "@shared/schema";
+import { 
+  schools, 
+  exams, 
+  questions, 
+  students, 
+  submissions, 
+  settings,
+  type School,
+  type InsertSchool,
+  type Exam,
+  type InsertExam,
+  type Question,
+  type InsertQuestion,
+  type Student,
+  type InsertStudent,
+  type Submission,
+  type InsertSubmission,
+  type Setting,
+  type InsertSetting,
+} from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
 
 export interface IStorage {
+  // School operations
+  getAllSchools(): Promise<School[]>;
+  getSchoolById(id: number): Promise<School | undefined>;
+  createSchool(school: InsertSchool): Promise<School>;
+  
+  // Exam operations
+  getAllExams(): Promise<Exam[]>;
+  getExamById(id: number): Promise<Exam | undefined>;
+  getExamsBySchool(schoolId: number): Promise<Exam[]>;
+  createExam(exam: InsertExam): Promise<Exam>;
+  
+  // Question operations
+  getQuestionsByExam(examId: number): Promise<Question[]>;
+  getAllQuestions(): Promise<Question[]>;
+  createQuestion(question: InsertQuestion): Promise<Question>;
+  createManyQuestions(questions: InsertQuestion[]): Promise<void>;
+  
   // Student operations
   getStudentByCredentials(studentId: string, studentName: string): Promise<Student | undefined>;
   getStudentById(studentId: string): Promise<Student | undefined>;
   getAllStudents(): Promise<Student[]>;
   createStudent(student: InsertStudent): Promise<Student>;
   
-  // Question operations
-  getQuestionsByUnit(unit: string): Promise<Question[]>;
-  getAllQuestions(): Promise<Question[]>;
-  createQuestion(question: InsertQuestion): Promise<Question>;
-  createManyQuestions(questions: InsertQuestion[]): Promise<void>;
-  
-  // Test result operations
-  createTestResult(result: InsertTestResult): Promise<TestResult>;
-  getTestResultsByStudent(studentId: string): Promise<TestResult[]>;
-  getTestResultsByUnit(unit: string): Promise<TestResult[]>;
-  getAllTestResults(): Promise<TestResult[]>;
+  // Submission operations
+  createSubmission(submission: InsertSubmission): Promise<Submission>;
+  getSubmissionsByStudent(studentId: string): Promise<Submission[]>;
+  getSubmissionsByExam(examId: number): Promise<Submission[]>;
+  getAllSubmissions(): Promise<Submission[]>;
   
   // Settings operations
   getSetting(key: string): Promise<Setting | undefined>;
@@ -28,6 +58,82 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // School operations
+  async getAllSchools(): Promise<School[]> {
+    return await db.select().from(schools);
+  }
+
+  async getSchoolById(id: number): Promise<School | undefined> {
+    const [school] = await db
+      .select()
+      .from(schools)
+      .where(eq(schools.id, id));
+    return school || undefined;
+  }
+
+  async createSchool(insertSchool: InsertSchool): Promise<School> {
+    const [school] = await db
+      .insert(schools)
+      .values(insertSchool)
+      .returning();
+    return school;
+  }
+
+  // Exam operations
+  async getAllExams(): Promise<Exam[]> {
+    return await db.select().from(exams);
+  }
+
+  async getExamById(id: number): Promise<Exam | undefined> {
+    const [exam] = await db
+      .select()
+      .from(exams)
+      .where(eq(exams.id, id));
+    return exam || undefined;
+  }
+
+  async getExamsBySchool(schoolId: number): Promise<Exam[]> {
+    return await db
+      .select()
+      .from(exams)
+      .where(eq(exams.schoolId, schoolId));
+  }
+
+  async createExam(insertExam: InsertExam): Promise<Exam> {
+    const [exam] = await db
+      .insert(exams)
+      .values(insertExam)
+      .returning();
+    return exam;
+  }
+
+  // Question operations
+  async getQuestionsByExam(examId: number): Promise<Question[]> {
+    return await db
+      .select()
+      .from(questions)
+      .where(eq(questions.examId, examId))
+      .orderBy(questions.questionNumber);
+  }
+
+  async getAllQuestions(): Promise<Question[]> {
+    return await db.select().from(questions);
+  }
+
+  async createQuestion(insertQuestion: InsertQuestion): Promise<Question> {
+    const [question] = await db
+      .insert(questions)
+      .values(insertQuestion)
+      .returning();
+    return question;
+  }
+
+  async createManyQuestions(insertQuestions: InsertQuestion[]): Promise<void> {
+    if (insertQuestions.length > 0) {
+      await db.insert(questions).values(insertQuestions);
+    }
+  }
+
   // Student operations
   async getStudentByCredentials(studentId: string, studentName: string): Promise<Student | undefined> {
     const [student] = await db
@@ -57,62 +163,36 @@ export class DatabaseStorage implements IStorage {
     return student;
   }
 
-  // Question operations
-  async getQuestionsByUnit(unit: string): Promise<Question[]> {
-    return await db
-      .select()
-      .from(questions)
-      .where(eq(questions.unit, unit));
-  }
-
-  async getAllQuestions(): Promise<Question[]> {
-    return await db.select().from(questions);
-  }
-
-  async createQuestion(insertQuestion: InsertQuestion): Promise<Question> {
-    const [question] = await db
-      .insert(questions)
-      .values(insertQuestion)
+  // Submission operations
+  async createSubmission(insertSubmission: InsertSubmission): Promise<Submission> {
+    const [submission] = await db
+      .insert(submissions)
+      .values(insertSubmission)
       .returning();
-    return question;
+    return submission;
   }
 
-  async createManyQuestions(insertQuestions: InsertQuestion[]): Promise<void> {
-    if (insertQuestions.length > 0) {
-      await db.insert(questions).values(insertQuestions);
-    }
-  }
-
-  // Test result operations
-  async createTestResult(insertResult: InsertTestResult): Promise<TestResult> {
-    const [result] = await db
-      .insert(testResults)
-      .values(insertResult)
-      .returning();
-    return result;
-  }
-
-  async getTestResultsByStudent(studentId: string): Promise<TestResult[]> {
+  async getSubmissionsByStudent(studentId: string): Promise<Submission[]> {
     return await db
       .select()
-      .from(testResults)
-      .where(eq(testResults.studentId, studentId))
-      .orderBy(desc(testResults.submittedAt));
+      .from(submissions)
+      .where(eq(submissions.studentId, studentId))
+      .orderBy(desc(submissions.submittedAt));
   }
 
-  async getTestResultsByUnit(unit: string): Promise<TestResult[]> {
+  async getSubmissionsByExam(examId: number): Promise<Submission[]> {
     return await db
       .select()
-      .from(testResults)
-      .where(eq(testResults.unit, unit))
-      .orderBy(desc(testResults.submittedAt));
+      .from(submissions)
+      .where(eq(submissions.examId, examId))
+      .orderBy(desc(submissions.submittedAt));
   }
 
-  async getAllTestResults(): Promise<TestResult[]> {
+  async getAllSubmissions(): Promise<Submission[]> {
     return await db
       .select()
-      .from(testResults)
-      .orderBy(desc(testResults.submittedAt));
+      .from(submissions)
+      .orderBy(desc(submissions.submittedAt));
   }
 
   // Settings operations
