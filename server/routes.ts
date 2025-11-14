@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { loginSchema, submitTestSchema, type UnitResult } from "@shared/schema";
-import { readExamDataFromSheet } from "./googleSheets";
+import { readExamDataFromSheet, writeExamDataToSheet } from "./googleSheets";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Login endpoint
@@ -344,6 +344,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Init data error:', error);
       return res.status(500).json({
         message: error.message || "데이터 초기화 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
+  // Upload current data to Google Sheets
+  app.post("/api/upload-to-sheets", async (req, res) => {
+    try {
+      const { spreadsheetId } = req.body;
+      
+      if (!spreadsheetId) {
+        return res.status(400).json({
+          message: "스프레드시트 ID가 필요합니다.",
+        });
+      }
+
+      console.log(`Uploading data to Google Sheets: ${spreadsheetId}`);
+
+      const allExams = await storage.getAllExams();
+      const exportData: any[] = [];
+
+      for (const exam of allExams) {
+        const questions = await storage.getQuestionsByExam(exam.id);
+        
+        for (const question of questions) {
+          // Parse answer if it's JSON (multiple answers)
+          let answer = question.answer;
+          let isMultipleAnswer = question.isMultipleAnswer;
+          
+          if (question.isMultipleAnswer) {
+            try {
+              const parsed = JSON.parse(question.answer);
+              if (Array.isArray(parsed)) {
+                answer = parsed.join(',');
+              }
+            } catch {
+              // If parsing fails, use as is
+            }
+          }
+
+          exportData.push({
+            schoolName: exam.schoolName,
+            year: exam.year,
+            semester: exam.semester,
+            questionNumber: question.questionNumber,
+            category: question.category,
+            unit: question.unit,
+            answer,
+            isMultipleAnswer,
+          });
+        }
+      }
+
+      await writeExamDataToSheet(spreadsheetId, exportData);
+
+      return res.json({
+        message: "구글 시트 업로드 완료",
+        questionCount: exportData.length,
+      });
+    } catch (error: any) {
+      console.error('Upload to sheets error:', error);
+      return res.status(500).json({
+        message: error.message || "구글 시트 업로드 중 오류가 발생했습니다.",
       });
     }
   });

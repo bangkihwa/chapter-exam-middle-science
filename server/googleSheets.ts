@@ -379,3 +379,46 @@ export async function readExamDataFromSheet(spreadsheetId: string) {
     throw error;
   }
 }
+
+export async function writeExamDataToSheet(spreadsheetId: string, examData: any[]) {
+  try {
+    const sheets = await getUncachableGoogleSheetClient();
+    
+    // Clear existing data first
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId,
+      range: 'Sheet1!A:H',
+    });
+
+    // Prepare header
+    const header = ['학교명', '년도', '학기', '문항번호', '분류', '단원', '정답', '복수정답'];
+    
+    // Prepare rows
+    const rows = examData.map(item => [
+      item.schoolName,
+      item.year,
+      item.semester,
+      item.questionNumber,
+      item.category,
+      item.unit,
+      item.answer,
+      item.isMultipleAnswer ? 'Y' : 'N',
+    ]);
+
+    // Write data
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: 'Sheet1!A1:H',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [header, ...rows],
+      },
+    });
+
+    console.log(`✅ Wrote ${rows.length} questions to Google Sheets`);
+    return true;
+  } catch (error) {
+    console.error('Error writing exam data to Google Sheets:', error);
+    throw error;
+  }
+}
