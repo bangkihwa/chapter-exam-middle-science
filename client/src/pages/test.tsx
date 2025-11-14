@@ -144,15 +144,21 @@ export default function TestPage() {
       <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setLocation(`/exams/${exam?.schoolId}`)}
-              data-testid="button-back"
-            >
-              <ChevronLeft className="w-4 h-4 mr-2" />
-              시험 선택
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setLocation(`/exams/${exam?.schoolId}`)}
+                data-testid="button-back"
+              >
+                <ChevronLeft className="w-4 h-4 mr-2" />
+                시험 선택
+              </Button>
+              <div>
+                <h1 className="text-sm font-bold">목동에이원과학학원</h1>
+                <p className="text-xs font-semibold text-primary">프리미엄내신관리 시스템</p>
+              </div>
+            </div>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="font-mono">
                 {student.studentName}

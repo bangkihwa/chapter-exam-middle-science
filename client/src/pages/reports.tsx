@@ -9,7 +9,7 @@ import { ChevronLeft, Calendar, FileText, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 import type { Submission, Exam, UnitResult } from "@shared/schema";
 
-interface EnrichedSubmission extends Submission {
+interface EnrichedSubmission extends Omit<Submission, 'unitResults'> {
   exam: Exam;
   unitResults: UnitResult[];
 }
@@ -55,15 +55,21 @@ export default function ReportsPage() {
       <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setLocation("/schools")}
-              data-testid="button-back-to-schools"
-            >
-              <ChevronLeft className="w-4 h-4 mr-2" />
-              학교 선택
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setLocation("/schools")}
+                data-testid="button-back-to-schools"
+              >
+                <ChevronLeft className="w-4 h-4 mr-2" />
+                학교 선택
+              </Button>
+              <div>
+                <h1 className="text-sm font-bold">목동에이원과학학원</h1>
+                <p className="text-xs font-semibold text-primary">프리미엄내신관리 시스템</p>
+              </div>
+            </div>
             <div className="text-right">
               <p className="text-sm font-medium">{student.studentName}</p>
               <p className="text-xs text-muted-foreground font-mono">{student.studentId}</p>
