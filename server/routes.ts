@@ -238,6 +238,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       return res.json({
         submissionId: submission.id,
+        examId,
         score,
         totalQuestions,
         answeredQuestions,
@@ -276,6 +277,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       return res.status(500).json({
         message: error.message || "제출 기록을 불러오는 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
+  // Get unit statistics for an exam (평균 및 최고 성적)
+  app.get("/api/exams/:examId/unit-stats", async (req, res) => {
+    try {
+      const examId = parseInt(req.params.examId);
+      const submissions = await storage.getSubmissionsByExam(examId);
+      
+      if (submissions.length === 0) {
+        return res.json([]);
+      }
+
+      // Parse all unit results
+      const allUnitResults = submissions.flatMap(sub => 
+        JSON.parse(sub.unitResults) as UnitResult[]
+      );
+
+      // Group by category and unit
+      const unitMap = new Map<string, { 
+        category: string; 
+        unit: string; 
+        scores: number[];
+      }>();
+
+      allUnitResults.forEach(unitResult => {
+        const key = `${unitResult.category}|${unitResult.unit}`;
+        if (!unitMap.has(key)) {
+          unitMap.set(key, {
+            category: unitResult.category,
+            unit: unitResult.unit,
+            scores: []
+          });
+        }
+        unitMap.get(key)!.scores.push(unitResult.achievementRate);
+      });
+
+      // Calculate statistics
+      const stats = Array.from(unitMap.values()).map(({ category, unit, scores }) => {
+        const average = scores.length > 0 
+          ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+          : 0;
+        const highest = scores.length > 0 ? Math.max(...scores) : 0;
+        
+        return {
+          category,
+          unit,
+          average,
+          highest,
+          studentCount: scores.length
+        };
+      });
+
+      return res.json(stats);
+    } catch (error: any) {
+      return res.status(500).json({
+        message: error.message || "단원별 통계를 불러오는 중 오류가 발생했습니다.",
       });
     }
   });
