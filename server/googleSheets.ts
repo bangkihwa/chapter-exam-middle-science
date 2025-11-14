@@ -350,3 +350,32 @@ export async function readQuestionStats(spreadsheetId: string, unit?: string) {
     return [];
   }
 }
+
+export async function readExamDataFromSheet(spreadsheetId: string) {
+  try {
+    const sheets = await getUncachableGoogleSheetClient();
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: 'Sheet1!A2:H',
+    });
+
+    const rows = response.data.values || [];
+    
+    const examData = rows.map(row => ({
+      schoolName: row[0] || '',
+      year: parseInt(row[1]) || 0,
+      semester: row[2] || '',
+      questionNumber: parseInt(row[3]) || 0,
+      category: row[4] || '',
+      unit: row[5] || '',
+      answer: row[6] || '',
+      isMultipleAnswer: (row[7] || 'N').toUpperCase() === 'Y',
+    }));
+
+    return examData;
+  } catch (error) {
+    console.error('Error reading exam data from Google Sheets:', error);
+    throw error;
+  }
+}

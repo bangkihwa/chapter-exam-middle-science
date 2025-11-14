@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { loginSchema, submitTestSchema, type UnitResult } from "@shared/schema";
+import { readExamDataFromSheet } from "./googleSheets";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Login endpoint
@@ -343,6 +344,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Init data error:', error);
       return res.status(500).json({
         message: error.message || "데이터 초기화 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
+  // Load data from Google Sheets
+  app.post("/api/load-from-sheets", async (req, res) => {
+    try {
+      const { spreadsheetId } = req.body;
+      
+      if (!spreadsheetId) {
+        return res.status(400).json({
+          message: "스프레드시트 ID가 필요합니다.",
+        });
+      }
+
+      console.log(`Loading exam data from Google Sheets: ${spreadsheetId}`);
+      
+      const sheetData = await readExamDataFromSheet(spreadsheetId);
+      
+      console.log(`Found ${sheetData.length} questions in Google Sheets`);
+
+      // Group by school and exam
+      const examMap = new Map<string, Map<string, any[]>>();
+      
+      for (const row of sheetData) {
+        if (!row.schoolName || !row.year || !row.semester) {
+          continue;
+        }
+
+        const schoolKey = row.schoolName;
+        const examKey = `${row.year}_${row.semester}`;
+        
+        if (!examMap.has(schoolKey)) {
+          examMap.set(schoolKey, new Map());
+        }
+        
+        const schoolExams = examMap.get(schoolKey)!;
+        if (!schoolExams.has(examKey)) {
+          schoolExams.set(examKey, []);
+        }
+
+        // Normalize answer format for multiple answers
+        let answer = row.answer;
+        if (row.isMultipleAnswer) {
+          const answers = answer.split(',').map((a: string) => a.trim()).filter((a: string) => a).sort();
+          answer = JSON.stringify(answers);
+        }
+        
+        schoolExams.get(examKey)!.push({
+          questionNumber: row.questionNumber,
+          type: '객관식',
+          category: row.category,
+          unit: row.unit,
+          answer,
+          isMultipleAnswer: row.isMultipleAnswer,
+        });
+      }
+
+      // Create schools and exams
+      let schoolCount = 0;
+      let questionCount = 0;
+
+      for (const [schoolName, examData] of Array.from(examMap.entries())) {
+        // Check if school already exists
+        let school = (await storage.getAllSchools()).find(s => s.name === schoolName);
+        
+        if (!school) {
+          school = await storage.createSchool({ name: schoolName });
+          schoolCount++;
+        }
+        
+        for (const [examKey, examQuestions] of Array.from(examData.entries())) {
+          const [year, semester] = examKey.split('_');
+          
+          // Check if exam already exists
+          const existingExams = await storage.getExamsBySchool(school.id);
+          let exam = existingExams.find(e => 
+            e.year === parseInt(year) && e.semester === semester
+          );
+          
+          if (!exam) {
+            exam = await storage.createExam({
+              schoolId: school.id,
+              schoolName: school.name,
+              year: parseInt(year),
+              semester,
+              subject: "통합과학",
+            });
+          }
+
+          if (examQuestions.length > 0) {
+            await storage.createManyQuestions(examQuestions.map((q: any) => ({
+              ...q,
+              examId: exam.id,
+            })));
+            questionCount += examQuestions.length;
+          }
+        }
+      }
+
+      const schools = await storage.getAllSchools();
+      const questions = await storage.getAllQuestions();
+
+      return res.json({
+        message: "구글 시트 데이터 로드 완료",
+        schoolCount: schools.length,
+        newSchools: schoolCount,
+        questionCount: questions.length,
+        newQuestions: questionCount,
+      });
+    } catch (error: any) {
+      console.error('Load from sheets error:', error);
+      return res.status(500).json({
+        message: error.message || "구글 시트 데이터 로드 중 오류가 발생했습니다.",
       });
     }
   });
