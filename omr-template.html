@@ -33,9 +33,10 @@
 
         .container {
             max-width: 210mm;
+            min-height: 297mm;  /* A4 높이 */
             margin: 0 auto;
             background: white;
-            padding: 15mm;
+            padding: 12mm;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
             position: relative;
         }
@@ -149,7 +150,7 @@
         .question-row {
             display: flex;
             align-items: center;
-            padding: 6px;
+            padding: 5px;
             border: 1px solid #ddd;
             background: white;
         }
@@ -286,7 +287,7 @@
 
     <script>
         // 문항 수 설정 (필요에 따라 변경 가능)
-        const totalQuestions = 40;
+        const totalQuestions = 30;  // 대부분 시험이 23-27문항이므로 30문항으로 설정
         const choices = ['①', '②', '③', '④', '⑤'];
 
         const answerGrid = document.getElementById('answerGrid');
