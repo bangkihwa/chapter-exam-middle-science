@@ -290,14 +290,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let isCorrect = false;
 
         if (studentAnswer) {
+          // Parse correct answer from database (stored as JSON array)
+          const correctAnswerArray = JSON.parse(question.answer) as string[];
+          
           // Handle multiple answers
           if (question.isMultipleAnswer) {
-            const correctAnswers = JSON.parse(question.answer) as string[];
             const studentAnswerList = studentAnswer.answer.split(',').map(a => a.trim()).sort();
-            const correctAnswerList = correctAnswers.sort();
+            const correctAnswerList = correctAnswerArray.sort();
             isCorrect = JSON.stringify(studentAnswerList) === JSON.stringify(correctAnswerList);
           } else {
-            isCorrect = studentAnswer.answer === question.answer;
+            // Single answer: compare first element of correct answer array with student answer
+            isCorrect = correctAnswerArray[0] === studentAnswer.answer;
           }
 
           if (isCorrect) {
