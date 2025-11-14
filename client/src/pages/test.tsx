@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, Send, AlertCircle } from "lucide-react";
+import { ChevronLeft, Send, AlertCircle, Camera, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Question, Exam, SubmitTest } from "@shared/schema";
@@ -21,6 +21,8 @@ export default function TestPage() {
   const student = studentData ? JSON.parse(studentData) : null;
 
   const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [isScanning, setIsScanning] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!student) {
@@ -86,6 +88,79 @@ export default function TestPage() {
     const currentAnswer = answers[questionNumber] || "";
     const answerList = currentAnswer.split(',').map(a => a.trim());
     return answerList.includes(option);
+  };
+
+  const handleOMRScan = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // 파일 크기 체크 (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "파일 크기 초과",
+        description: "10MB 이하의 이미지만 업로드 가능합니다.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsScanning(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      if (examIdNum) {
+        formData.append("examId", examIdNum.toString());
+      }
+
+      const response = await fetch("/api/omr/scan", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.message || "OMR 스캔에 실패했습니다");
+      }
+
+      // 스캔된 답안을 기존 답안과 병합 (기존 수동 입력 유지)
+      // 숫자 형식("1", "2")을 원 숫자 형식("①", "②")으로 변환
+      const convertToCircledNumber = (num: string): string => {
+        const map: Record<string, string> = { "1": "①", "2": "②", "3": "③", "4": "④", "5": "⑤" };
+        return map[num] || num;
+      };
+
+      const scannedAnswers: Record<number, string> = {};
+      result.answers.forEach((answer: { questionNumber: number; answer: string }) => {
+        // 쉼표로 구분된 복수 답안 처리 ("2,3" → "②,③")
+        const convertedAnswer = answer.answer
+          .split(',')
+          .map(a => convertToCircledNumber(a.trim()))
+          .join(',');
+        scannedAnswers[answer.questionNumber] = convertedAnswer;
+      });
+
+      // 기존 답안과 merge (스캔된 답안이 우선하지만 기존 답안도 유지)
+      setAnswers(prev => ({ ...prev, ...scannedAnswers }));
+
+      toast({
+        title: "OMR 스캔 완료",
+        description: result.message || `${Object.keys(scannedAnswers).length}개 답안이 인식되었습니다`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "OMR 스캔 실패",
+        description: error.message || "이미지 처리 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsScanning(false);
+      // 파일 입력 초기화
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   };
 
   const handleSubmit = () => {
@@ -201,6 +276,41 @@ export default function TestPage() {
                 <p className="text-muted-foreground">
                   객관식 문제의 정답을 선택하세요
                 </p>
+                
+                {/* OMR 스캔 버튼 */}
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleOMRScan}
+                    className="hidden"
+                    data-testid="input-omr-file"
+                  />
+                  <Button
+                    variant="outline"
+                    size="default"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isScanning}
+                    className="gap-2"
+                    data-testid="button-omr-scan"
+                  >
+                    {isScanning ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        처리 중...
+                      </>
+                    ) : (
+                      <>
+                        <Camera className="w-4 h-4" />
+                        OMR 사진 찍기
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    종이 답안지를 사진으로 찍어 자동으로 입력하세요
+                  </p>
+                </div>
               </div>
 
               <div className="space-y-6">

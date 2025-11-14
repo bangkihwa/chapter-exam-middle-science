@@ -3,8 +3,28 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { loginSchema, submitTestSchema, type UnitResult } from "@shared/schema";
 import { readExamDataFromSheet, writeExamDataToSheet, writeStudentResultToSheet } from "./googleSheets";
+import multer from "multer";
+import { spawn } from "child_process";
+import path from "path";
+import fs from "fs";
 
 const SPREADSHEET_ID = "1Mi70D_RLWqSCqmlCl2t_yUfdiByF1ExXkLrn7SQcv7k";
+
+// Multer 설정 - OMR 이미지 업로드용
+const upload = multer({
+  dest: "uploads/",
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB 제한
+  },
+  fileFilter: (req, file, cb) => {
+    // 이미지 파일만 허용
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("이미지 파일만 업로드 가능합니다"));
+    }
+  },
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Login endpoint
@@ -104,6 +124,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       return res.status(500).json({
         message: error.message || "문제를 불러오는 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
+  // OMR 이미지 스캔 엔드포인트
+  app.post("/api/omr/scan", upload.single("image"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "이미지 파일이 업로드되지 않았습니다",
+        });
+      }
+
+      const examId = req.body.examId ? parseInt(req.body.examId) : null;
+      let totalQuestions = 30; // 기본값
+
+      // 시험 ID가 제공된 경우 실제 문제 수 확인
+      if (examId) {
+        const questions = await storage.getQuestionsByExam(examId);
+        const multipleChoiceQuestions = questions.filter(q => q.type === "객관식");
+        totalQuestions = multipleChoiceQuestions.length;
+      }
+
+      const imagePath = req.file.path;
+
+      // Python 스크립트 실행
+      const pythonProcess = spawn("python3", [
+        path.join(process.cwd(), "server", "omr_process.py"),
+        imagePath,
+        totalQuestions.toString(),
+      ]);
+
+      let outputData = "";
+      let errorData = "";
+
+      pythonProcess.stdout.on("data", (data) => {
+        outputData += data.toString();
+      });
+
+      pythonProcess.stderr.on("data", (data) => {
+        errorData += data.toString();
+      });
+
+      // Python 프로세스 실행 에러 처리
+      pythonProcess.on("error", (error) => {
+        console.error("Python 프로세스 실행 실패:", error);
+        
+        // 임시 파일 삭제
+        fs.unlink(imagePath, (err) => {
+          if (err) console.error("임시 파일 삭제 실패:", err);
+        });
+
+        return res.status(500).json({
+          success: false,
+          message: "OMR 처리 프로그램을 실행할 수 없습니다",
+          error: error.message,
+        });
+      });
+
+      pythonProcess.on("close", (code) => {
+        // 임시 파일 삭제
+        fs.unlink(imagePath, (err) => {
+          if (err) console.error("임시 파일 삭제 실패:", err);
+        });
+
+        if (code !== 0) {
+          console.error("Python 스크립트 오류:", errorData);
+          return res.status(500).json({
+            success: false,
+            message: "OMR 이미지 처리 중 오류가 발생했습니다",
+            error: errorData,
+          });
+        }
+
+        try {
+          const result = JSON.parse(outputData);
+          
+          if (!result.success) {
+            return res.status(400).json({
+              success: false,
+              message: result.message || "OMR 인식에 실패했습니다",
+              error: result.error,
+            });
+          }
+
+          // 답안 형식 변환: {1: "2", 2: "3,4"} -> [{questionNumber: 1, answer: "2"}, ...]
+          const answers = Object.entries(result.answers).map(([questionNumber, answer]) => ({
+            questionNumber: parseInt(questionNumber),
+            answer: answer as string,
+          }));
+
+          return res.json({
+            success: true,
+            answers,
+            message: result.message,
+          });
+        } catch (parseError: any) {
+          console.error("JSON 파싱 오류:", parseError);
+          return res.status(500).json({
+            success: false,
+            message: "결과 처리 중 오류가 발생했습니다",
+            error: parseError.message,
+          });
+        }
+      });
+    } catch (error: any) {
+      // 에러 발생 시 업로드된 파일 삭제
+      if (req.file) {
+        fs.unlink(req.file.path, (err) => {
+          if (err) console.error("파일 삭제 실패:", err);
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        message: error.message || "OMR 스캔 중 오류가 발생했습니다",
       });
     }
   });
