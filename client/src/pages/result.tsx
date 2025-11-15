@@ -68,7 +68,7 @@ export default function ResultPage() {
     return null;
   }
 
-  const isPerfect = result.correctAnswers === result.totalQuestions;
+  const isPerfect = result.correctAnswers === result.answeredQuestions;
   const incorrectAnswers = result.answeredQuestions - result.correctAnswers;
   const unansweredQuestions = result.totalQuestions - result.answeredQuestions;
   

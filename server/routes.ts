@@ -338,20 +338,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      // Calculate achievement rates for units
-      const unitResults: UnitResult[] = Array.from(unitMap.values()).map(unit => ({
-        ...unit,
-        achievementRate: unit.total > 0 
-          ? Math.round((unit.correct / unit.total) * 100) 
-          : 0,
-      }));
+      // Calculate achievement rates for units (based on answered questions only)
+      const unitResults: UnitResult[] = Array.from(unitMap.values()).map(unit => {
+        const unitAnswered = unit.correct + unit.wrong;
+        return {
+          ...unit,
+          achievementRate: unitAnswered > 0 
+            ? Math.round((unit.correct * 100) / unitAnswered) 
+            : 0,
+        };
+      });
 
-      const achievementRate = totalQuestions > 0 
-        ? Math.round((correctAnswers / totalQuestions) * 100)
+      // Calculate overall achievement rate and score (based on answered questions only)
+      const achievementRate = answeredQuestions > 0 
+        ? Math.round((correctAnswers * 100) / answeredQuestions)
         : 0;
 
-      const score = totalQuestions > 0
-        ? Math.round((correctAnswers / totalQuestions) * 100)
+      const score = answeredQuestions > 0
+        ? Math.round((correctAnswers * 100) / answeredQuestions)
         : 0;
 
       const submission = await storage.createSubmission({

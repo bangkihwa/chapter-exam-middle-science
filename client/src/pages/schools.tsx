@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { GraduationCap, LogOut, Building2 } from "lucide-react";
+import { GraduationCap, LogOut, Building2, BarChart3 } from "lucide-react";
 import { useEffect } from "react";
 import type { School } from "@shared/schema";
 
@@ -33,6 +33,10 @@ export default function SchoolsPage() {
     setLocation(`/exams/${schoolId}`);
   };
 
+  const handleViewReports = () => {
+    setLocation("/reports");
+  };
+
   if (!student) {
     return null;
   }
@@ -55,6 +59,15 @@ export default function SchoolsPage() {
               <p className="text-sm font-medium">{student.studentName}</p>
               <p className="text-xs text-muted-foreground font-mono">{student.studentId}</p>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="button-view-reports"
+              onClick={handleViewReports}
+            >
+              <BarChart3 className="w-4 h-4 mr-2" />
+              성적 확인
+            </Button>
             <Button
               variant="ghost"
               size="sm"
