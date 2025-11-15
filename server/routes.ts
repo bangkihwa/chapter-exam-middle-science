@@ -290,8 +290,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let isCorrect = false;
 
         if (studentAnswer) {
-          // Parse correct answer from database (stored as JSON array)
-          const correctAnswerArray = JSON.parse(question.answer) as string[];
+          // Parse correct answer from database (handle both JSON array and plain string formats)
+          let correctAnswerArray: string[];
+          try {
+            // Try parsing as JSON array first (e.g., ["③"])
+            correctAnswerArray = JSON.parse(question.answer) as string[];
+          } catch {
+            // If parsing fails, treat as plain string (e.g., "③")
+            correctAnswerArray = [question.answer];
+          }
           
           // Handle multiple answers
           if (question.isMultipleAnswer) {
