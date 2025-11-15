@@ -339,15 +339,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Calculate achievement rates for units (based on answered questions only)
-      const unitResults: UnitResult[] = Array.from(unitMap.values()).map(unit => {
-        const unitAnswered = unit.correct + unit.wrong;
-        return {
-          ...unit,
-          achievementRate: unitAnswered > 0 
-            ? Math.round((unit.correct * 100) / unitAnswered) 
-            : 0,
-        };
-      });
+      // Filter out units with no answered questions
+      const unitResults: UnitResult[] = Array.from(unitMap.values())
+        .filter(unit => {
+          const unitAnswered = unit.correct + unit.wrong;
+          return unitAnswered > 0;
+        })
+        .map(unit => {
+          const unitAnswered = unit.correct + unit.wrong;
+          return {
+            ...unit,
+            achievementRate: Math.round((unit.correct * 100) / unitAnswered),
+          };
+        });
 
       // Calculate overall achievement rate and score (based on answered questions only)
       const achievementRate = answeredQuestions > 0 
