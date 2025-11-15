@@ -276,11 +276,17 @@ export default function ResultPage() {
     return guidance;
   };
 
-  const studentFeedback = getDetailedStudentFeedback(result.achievementRate, result.unitResults);
-  const teacherGuidance = getTeacherGuidance(result.unitResults, result.achievementRate);
+  // Filter out units with no answered questions (응시하지 않은 단원 제외)
+  const answeredUnitResults = result.unitResults.filter(unit => {
+    const answered = unit.correct + unit.wrong;
+    return answered > 0;
+  });
+
+  const studentFeedback = getDetailedStudentFeedback(result.achievementRate, answeredUnitResults);
+  const teacherGuidance = getTeacherGuidance(answeredUnitResults, result.achievementRate);
 
   // Prepare chart data
-  const chartData = result.unitResults.map(unit => ({
+  const chartData = answeredUnitResults.map(unit => ({
     name: unit.unit.length > 10 ? unit.unit.substring(0, 10) + '...' : unit.unit,
     fullName: unit.unit,
     나의성적: unit.achievementRate,
@@ -288,7 +294,7 @@ export default function ResultPage() {
     최고점: unitStats?.find(s => s.category === unit.category && s.unit === unit.unit)?.highest || 0,
   }));
 
-  const radarData = result.unitResults.map(unit => ({
+  const radarData = answeredUnitResults.map(unit => ({
     unit: unit.unit.length > 8 ? unit.unit.substring(0, 8) + '...' : unit.unit,
     fullName: unit.unit,
     value: unit.achievementRate,
@@ -627,7 +633,7 @@ export default function ResultPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {result.unitResults.map((unit, i) => {
+                    {answeredUnitResults.map((unit, i) => {
                       const stats = unitStats?.find(s => s.unit === unit.unit);
                       const myScore = unit.achievementRate;
                       const avgScore = stats?.average || 0;
@@ -759,7 +765,7 @@ export default function ResultPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-5">
-                    {result.unitResults.map((unit, i) => {
+                    {answeredUnitResults.map((unit, i) => {
                       const stats = unitStats?.find(s => s.unit === unit.unit);
                       let teachingTips: string[] = [];
                       let urgency = "";
