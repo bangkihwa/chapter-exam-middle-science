@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { loginSchema, submitTestSchema, type UnitResult } from "@shared/schema";
-import { readExamDataFromSheet, writeExamDataToSheet, writeStudentResultToSheet } from "./googleSheets";
+import { readExamDataFromSheet, writeExamDataToSheet, writeStudentResultToSheet, readResultsFromSheet, readAllResultsFromSheet } from "./googleSheets";
 import multer from "multer";
 import { spawn } from "child_process";
 import path from "path";
@@ -809,6 +809,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       return res.status(500).json({
         message: error.message || "제출 기록을 불러오는 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
+  app.get("/api/admin/all-results", async (req, res) => {
+    try {
+      const setting = await storage.getSetting("spreadsheet-id");
+      const spreadsheetId = setting?.value;
+      
+      if (!spreadsheetId) {
+        return res.json([]);
+      }
+
+      console.log(`[Admin] Reading results from Google Sheets (시트3)...`);
+      const results = await readAllResultsFromSheet(spreadsheetId);
+      console.log(`[Admin] Found ${results.length} results in 시트3`);
+      
+      const formattedResults = results.map(result => ({
+        studentId: result.studentId,
+        studentName: result.studentName,
+        textbook: result.exam,
+        unit: result.unit,
+        submittedAt: result.submittedAt,
+        achievementRate: result.achievementRate,
+        feedback: '',
+      }));
+      
+      return res.json(formattedResults);
+    } catch (error: any) {
+      console.error('Error reading results from Google Sheets:', error);
+      return res.status(500).json({
+        message: error.message || "구글 시트에서 성적을 불러오는 중 오류가 발생했습니다.",
       });
     }
   });

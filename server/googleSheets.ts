@@ -524,3 +524,33 @@ export async function writeStudentResultToSheet(spreadsheetId: string, result: a
     throw error;
   }
 }
+
+export async function readAllResultsFromSheet(spreadsheetId: string) {
+  try {
+    const sheets = await getUncachableGoogleSheetClient();
+    
+    await ensureSheetExists(spreadsheetId, '시트3');
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: '시트3!A2:I',
+    });
+
+    const rows = response.data.values || [];
+    
+    return rows.map(row => ({
+      studentId: row[0] || '',
+      studentName: row[1] || '',
+      exam: row[2] || '',
+      unit: row[3] || '',
+      correct: parseInt(row[4] || '0'),
+      wrong: parseInt(row[5] || '0'),
+      unanswered: parseInt(row[6] || '0'),
+      achievementRate: parseInt(row[7]?.replace('%', '') || '0'),
+      submittedAt: row[8] || '',
+    }));
+  } catch (error) {
+    console.error('Error reading all results from Google Sheets (시트3):', error);
+    return [];
+  }
+}
