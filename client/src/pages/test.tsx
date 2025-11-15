@@ -44,9 +44,19 @@ export default function TestPage() {
     mutationFn: async (data: SubmitTest) => {
       return await apiRequest("POST", "/api/test/submit", data);
     },
-    onSuccess: (result) => {
+    onSuccess: (result: any) => {
       queryClient.invalidateQueries();
       sessionStorage.setItem("testResult", JSON.stringify(result));
+      
+      // 구글 시트 연동 상태 확인
+      if (result.googleSheets && !result.googleSheets.success) {
+        toast({
+          title: "⚠️ 구글 시트 연동 실패",
+          description: result.googleSheets.error || "시험 결과는 저장되었으나 구글 시트 업로드에 실패했습니다.",
+          variant: "destructive",
+        });
+      }
+      
       setLocation("/result");
     },
     onError: (error: any) => {

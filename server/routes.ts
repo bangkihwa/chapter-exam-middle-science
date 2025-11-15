@@ -368,6 +368,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Write result to Google Sheets (시트2, 시트3)
+      let googleSheetsSuccess = false;
+      let googleSheetsError = null;
+      
       try {
         await writeStudentResultToSheet(SPREADSHEET_ID, {
           studentId,
@@ -378,8 +381,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           unitResults,
           submittedAt: submission.submittedAt,
         });
-      } catch (sheetError) {
-        console.error('Failed to write to Google Sheets:', sheetError);
+        console.log('✅ Wrote student result to Google Sheets (시트2, 시트3)');
+        googleSheetsSuccess = true;
+      } catch (sheetError: any) {
+        console.error('❌ Failed to write to Google Sheets:', sheetError);
+        googleSheetsError = sheetError.message || '구글 시트 연동 실패';
         // Continue even if Google Sheets fails
       }
 
@@ -393,6 +399,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         achievementRate,
         unitResults,
         details,
+        googleSheets: {
+          success: googleSheetsSuccess,
+          error: googleSheetsError,
+        },
       });
     } catch (error: any) {
       console.error('Submit test error:', error);
