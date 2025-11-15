@@ -809,6 +809,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get spreadsheet ID setting
+  app.get("/api/admin/settings/spreadsheet-id", async (req, res) => {
+    try {
+      const setting = await storage.getSetting("spreadsheet-id");
+      return res.json({ value: setting?.value || "" });
+    } catch (error: any) {
+      return res.status(500).json({
+        message: error.message || "설정을 불러오는 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
+  // Update spreadsheet ID setting
+  app.post("/api/admin/settings/spreadsheet-id", async (req, res) => {
+    try {
+      const { value } = req.body;
+      
+      if (!value || typeof value !== "string") {
+        return res.status(400).json({
+          message: "구글 시트 ID를 입력해주세요.",
+        });
+      }
+
+      await storage.setSetting("spreadsheet-id", value);
+      
+      return res.json({ 
+        success: true,
+        value,
+      });
+    } catch (error: any) {
+      return res.status(500).json({
+        message: error.message || "설정 저장 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
