@@ -56,7 +56,7 @@ export default function ExamsPage() {
             </div>
             <div>
               <h1 className="text-lg font-bold">목동에이원과학학원</h1>
-              <p className="text-xs font-semibold text-primary">프리미엄내신관리 시스템</p>
+              <p className="text-xs font-semibold text-primary">프리미엄 학습관리 시스템</p>
               {schoolName && <p className="text-xs text-muted-foreground">{schoolName}</p>}
             </div>
           </div>

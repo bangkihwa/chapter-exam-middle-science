@@ -2,15 +2,29 @@
 
 ## Overview
 
-This is an OMR (Optical Mark Recognition) assessment system for Mokdong A1 Science Academy, specifically designed for physics education. The application enables students to:
+This is an OMR (Optical Mark Recognition) assessment system for Mokdong A1 Science Academy, specifically designed for **중등 통합과학 선행 (Middle School Integrated Science Pre-learning)** using the **런지 (Runji) textbook**.
+
+The application enables students to:
 
 - Log in using their student ID and name
-- Select from multiple physics curriculum units
-- Complete assessments by submitting answers
+- Select from 10 integrated science units based on the Runji textbook
+- Complete assessments by submitting answers (312 questions total)
 - View detailed results with performance analytics
 - Track progress across multiple test attempts
 
 The system automatically grades submissions against stored answer keys and provides immediate feedback with achievement rates, scores, and detailed answer comparisons.
+
+### Curriculum Units (런지 교재)
+1. 물질의 규칙성과 결합 (Questions 1-37)
+2. 생명체 구성 물질 (Questions 38-55)
+3. 물질의 전기적 성질 (Questions 56-77)
+4. 역학적 시스템 (Questions 78-97, excluding Q91)
+5. 생명 시스템 (Questions 98-115)
+6. 화학 변화 (산화 환원) (Questions 116-146)
+7. 화학 변화 (산과 염기) (Questions 147-188)
+8. 발전과 신재생 에너지 (태양 에너지) (Questions 189-214)
+9. 발전과 신재생 에너지 (전자기 유도) (Questions 215-248)
+10. 발전과 신재생 에너지 (에너지 전환 및 신재생) (Questions 249-312)
 
 ## User Preferences
 

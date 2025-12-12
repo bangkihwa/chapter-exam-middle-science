@@ -51,7 +51,7 @@ export default function UnitsPage() {
             </div>
             <div>
               <h1 className="text-lg font-bold">목동에이원과학학원</h1>
-              <p className="text-sm text-muted-foreground">통합과학</p>
+              <p className="text-sm text-muted-foreground">중등 통합과학 선행</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -91,7 +91,8 @@ export default function UnitsPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {units.map((unit, index) => {
-              const count = questionCounts?.[unit] || 0;
+              const counts = questionCounts as Record<string, number> | undefined;
+              const count = counts?.[unit] || 0;
               
               return (
                 <Card

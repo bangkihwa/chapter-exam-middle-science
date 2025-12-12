@@ -241,7 +241,7 @@ export default function TestPage() {
               </Button>
               <div>
                 <h1 className="text-sm font-bold">목동에이원과학학원</h1>
-                <p className="text-xs font-semibold text-primary">프리미엄내신관리 시스템</p>
+                <p className="text-xs font-semibold text-primary">프리미엄 학습관리 시스템</p>
               </div>
             </div>
             <div className="flex items-center gap-2">

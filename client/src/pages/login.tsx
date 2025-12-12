@@ -73,10 +73,10 @@ export default function LoginPage() {
           <div className="space-y-2">
             <CardTitle className="text-3xl font-bold">목동에이원과학학원</CardTitle>
             <CardDescription className="text-base font-semibold text-primary">
-              프리미엄내신관리 시스템
+              프리미엄 학습관리 시스템
             </CardDescription>
             <CardDescription className="text-sm">
-              통합과학 기출문제 채점 시스템
+              중등 통합과학 선행 - 런지 교재
             </CardDescription>
           </div>
         </CardHeader>

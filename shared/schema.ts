@@ -172,56 +172,59 @@ export const loginSchema = z.object({
 
 export type Login = z.infer<typeof loginSchema>;
 
-// Constants - 통합과학 단원 분류
+// Constants - 중등 통합과학 선행 단원 분류 (런지 교재)
 export const categories = [
-  "에너지",
-  "화학", 
-  "생태계",
-  "지구",
+  "물질",
   "생명",
-  "신소재",
+  "에너지",
 ] as const;
 
 export type Category = typeof categories[number];
 
 export const units = [
-  // 에너지
-  "전자기 유도",
-  "발전",
-  "전력 수송",
-  "전력 손실",
-  "에너지 효율",
-  // 화학
-  "산화-환원",
-  "산-염기",
-  "원소 주기성",
-  "화학 결합",
-  // 생태계
-  "생태계 구성",
-  "생태계 평형",
-  "진화와 변이",
-  "생물 다양성",
-  // 지구
-  "지구 시스템",
-  "지권 변동",
-  "지질 시대",
-  "대기 순환",
-  "지권과 에너지",
-  "지권",
-  // 생명
+  "물질의 규칙성과 결합",
   "생명체 구성 물질",
-  "물질대사",
-  "유전 정보",
-  "물질",
-  // 신소재
-  "반도체",
-  "초전도체",
-  "신소재",
+  "물질의 전기적 성질",
+  "역학적 시스템",
+  "생명 시스템",
+  "화학 변화 (산화 환원)",
+  "화학 변화 (산과 염기)",
+  "발전과 신재생 에너지 (태양 에너지)",
+  "발전과 신재생 에너지 (전자기 유도)",
+  "발전과 신재생 에너지 (에너지 전환 및 신재생)",
 ] as const;
 
 export type Unit = typeof units[number];
 
-export const SUBJECT_NAME = "통합과학";
+export const SUBJECT_NAME = "중등 통합과학 선행";
+
+// 단원별 문제 번호 범위 (런지 교재 기준)
+export const unitQuestionRanges: Record<string, { start: number; end: number; excludes?: number[] }> = {
+  "물질의 규칙성과 결합": { start: 1, end: 37 },
+  "생명체 구성 물질": { start: 38, end: 55 },
+  "물질의 전기적 성질": { start: 56, end: 77 },
+  "역학적 시스템": { start: 78, end: 97, excludes: [91] },
+  "생명 시스템": { start: 98, end: 115 },
+  "화학 변화 (산화 환원)": { start: 116, end: 146 },
+  "화학 변화 (산과 염기)": { start: 147, end: 188 },
+  "발전과 신재생 에너지 (태양 에너지)": { start: 189, end: 214 },
+  "발전과 신재생 에너지 (전자기 유도)": { start: 215, end: 248 },
+  "발전과 신재생 에너지 (에너지 전환 및 신재생)": { start: 249, end: 312 },
+};
+
+// 단원별 카테고리 매핑
+export const unitCategoryMap: Record<string, string> = {
+  "물질의 규칙성과 결합": "물질",
+  "생명체 구성 물질": "생명",
+  "물질의 전기적 성질": "물질",
+  "역학적 시스템": "에너지",
+  "생명 시스템": "생명",
+  "화학 변화 (산화 환원)": "물질",
+  "화학 변화 (산과 염기)": "물질",
+  "발전과 신재생 에너지 (태양 에너지)": "에너지",
+  "발전과 신재생 에너지 (전자기 유도)": "에너지",
+  "발전과 신재생 에너지 (에너지 전환 및 신재생)": "에너지",
+};
 
 // Unit result interface for detailed feedback
 export interface UnitResult {

@@ -55,6 +55,12 @@ export interface IStorage {
   getSetting(key: string): Promise<Setting | undefined>;
   setSetting(key: string, value: string): Promise<Setting>;
   getAllSettings(): Promise<Setting[]>;
+  
+  // Delete operations
+  deleteAllSubmissions(): Promise<void>;
+  deleteAllQuestions(): Promise<void>;
+  deleteAllExams(): Promise<void>;
+  deleteAllSchools(): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -225,6 +231,23 @@ export class DatabaseStorage implements IStorage {
 
   async getAllSettings(): Promise<Setting[]> {
     return await db.select().from(settings);
+  }
+
+  // Delete operations
+  async deleteAllSubmissions(): Promise<void> {
+    await db.delete(submissions);
+  }
+
+  async deleteAllQuestions(): Promise<void> {
+    await db.delete(questions);
+  }
+
+  async deleteAllExams(): Promise<void> {
+    await db.delete(exams);
+  }
+
+  async deleteAllSchools(): Promise<void> {
+    await db.delete(schools);
   }
 }
 
