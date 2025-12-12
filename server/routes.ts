@@ -20,7 +20,8 @@ function circleToNumber(answer: string): string {
 }
 
 // 답안 비교를 위한 정규화 함수
-function normalizeAnswer(answer: string): string {
+function normalizeAnswer(answer: string | undefined | null): string {
+  if (!answer) return "";
   // 원문자를 숫자로 변환
   let normalized = circleToNumber(answer.trim());
   // 앞뒤 공백 제거
