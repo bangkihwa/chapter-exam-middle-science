@@ -10,6 +10,23 @@ import fs from "fs";
 
 const SPREADSHEET_ID = "1Mi70D_RLWqSCqmlCl2t_yUfdiByF1ExXkLrn7SQcv7k";
 
+// 원문자를 숫자로 변환하는 함수
+function circleToNumber(answer: string): string {
+  const circleMap: { [key: string]: string } = {
+    "①": "1", "②": "2", "③": "3", "④": "4", "⑤": "5",
+    "⑥": "6", "⑦": "7", "⑧": "8", "⑨": "9", "⑩": "10",
+  };
+  return circleMap[answer] || answer;
+}
+
+// 답안 비교를 위한 정규화 함수
+function normalizeAnswer(answer: string): string {
+  // 원문자를 숫자로 변환
+  let normalized = circleToNumber(answer.trim());
+  // 앞뒤 공백 제거
+  return normalized;
+}
+
 // Multer 설정 - OMR 이미지 업로드용
 const upload = multer({
   dest: "uploads/",
@@ -333,12 +350,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Handle multiple answers
           if (question.isMultipleAnswer) {
-            const studentAnswerList = studentAnswer.answer.split(',').map(a => a.trim()).sort();
-            const correctAnswerList = correctAnswerArray.sort();
+            const studentAnswerList = studentAnswer.answer.split(',').map(a => normalizeAnswer(a)).sort();
+            const correctAnswerList = correctAnswerArray.map(a => normalizeAnswer(a)).sort();
             isCorrect = JSON.stringify(studentAnswerList) === JSON.stringify(correctAnswerList);
           } else {
-            // Single answer: compare first element of correct answer array with student answer
-            isCorrect = correctAnswerArray[0] === studentAnswer.answer;
+            // Single answer: compare first element of correct answer array with student answer (normalize both)
+            isCorrect = normalizeAnswer(correctAnswerArray[0]) === normalizeAnswer(studentAnswer.answer);
           }
 
           if (isCorrect) {
@@ -494,11 +511,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           if (question.isMultipleAnswer) {
-            const studentAnswerList = studentAnswer.answer.split(',').map((a: string) => a.trim()).sort();
-            const correctAnswerList = correctAnswerArray.sort();
+            const studentAnswerList = studentAnswer.answer.split(',').map((a: string) => normalizeAnswer(a)).sort();
+            const correctAnswerList = correctAnswerArray.map((a: string) => normalizeAnswer(a)).sort();
             isCorrect = JSON.stringify(studentAnswerList) === JSON.stringify(correctAnswerList);
           } else {
-            isCorrect = correctAnswerArray[0] === studentAnswer.answer;
+            isCorrect = normalizeAnswer(correctAnswerArray[0]) === normalizeAnswer(studentAnswer.answer);
           }
 
           if (isCorrect) {
