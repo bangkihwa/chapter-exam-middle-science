@@ -285,9 +285,17 @@ export default function ResultPage() {
   const studentFeedback = getDetailedStudentFeedback(result.achievementRate, answeredUnitResults);
   const teacherGuidance = getTeacherGuidance(answeredUnitResults, result.achievementRate);
 
+  // 단원명 축약 함수
+  const shortenUnitName = (name: string, maxLen: number = 6): string => {
+    // 괄호 내용 제거하고 축약
+    const withoutParens = name.replace(/\s*\([^)]*\)/g, '');
+    if (withoutParens.length <= maxLen) return withoutParens;
+    return withoutParens.substring(0, maxLen) + '...';
+  };
+
   // Prepare chart data
   const chartData = answeredUnitResults.map(unit => ({
-    name: unit.unit.length > 10 ? unit.unit.substring(0, 10) + '...' : unit.unit,
+    name: shortenUnitName(unit.unit),
     fullName: unit.unit,
     나의성적: unit.achievementRate,
     평균: unitStats?.find(s => s.category === unit.category && s.unit === unit.unit)?.average || 0,
@@ -295,7 +303,7 @@ export default function ResultPage() {
   }));
 
   const radarData = answeredUnitResults.map(unit => ({
-    unit: unit.unit.length > 8 ? unit.unit.substring(0, 8) + '...' : unit.unit,
+    unit: shortenUnitName(unit.unit, 5),
     fullName: unit.unit,
     value: unit.achievementRate,
     fullMark: 100,
@@ -587,13 +595,13 @@ export default function ResultPage() {
                 <CardContent>
                   <div className="h-96">
                     <ResponsiveContainer width="100%" height="100%">
-                      <RadarChart data={radarData}>
+                      <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="70%">
                         <PolarGrid stroke="var(--border)" />
                         <PolarAngleAxis 
                           dataKey="unit" 
-                          tick={{ fontSize: 12, fill: 'var(--foreground)' }}
+                          tick={{ fontSize: 10, fill: 'var(--foreground)' }}
                         />
-                        <PolarRadiusAxis angle={90} domain={[0, 100]} />
+                        <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10 }} />
                         <Radar 
                           name="나의 성취도" 
                           dataKey="value" 
