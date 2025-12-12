@@ -59,11 +59,11 @@ export default function ReportsPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setLocation("/schools")}
-                data-testid="button-back-to-schools"
+                onClick={() => setLocation("/units")}
+                data-testid="button-back-to-units"
               >
                 <ChevronLeft className="w-4 h-4 mr-2" />
-                학교 선택
+                단원 선택
               </Button>
               <div>
                 <h1 className="text-sm font-bold">목동에이원과학학원</h1>

@@ -83,11 +83,11 @@ export default function ExamsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={handleBack}
+              onClick={() => setLocation("/units")}
               data-testid="button-back"
             >
               <ChevronLeft className="w-4 h-4 mr-1" />
-              학교 선택
+              단원 선택
             </Button>
           </div>
 

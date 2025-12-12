@@ -886,12 +886,12 @@ export default function ResultPage() {
             </Button>
             <Button
               size="lg"
-              onClick={() => setLocation("/schools")}
+              onClick={() => setLocation("/units")}
               data-testid="button-home"
               className="text-lg px-6 py-6"
             >
               <Home className="w-5 h-5 mr-2" />
-              학교 선택으로
+              단원 선택으로
             </Button>
           </div>
         </div>

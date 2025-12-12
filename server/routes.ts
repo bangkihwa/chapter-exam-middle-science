@@ -342,8 +342,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Parse correct answer from database (handle both JSON array and plain string formats)
           let correctAnswerArray: string[];
           try {
-            // Try parsing as JSON array first (e.g., ["③"])
-            correctAnswerArray = JSON.parse(question.answer) as string[];
+            // Try parsing as JSON first
+            const parsed = JSON.parse(question.answer);
+            // Only use parsed result if it's an array, otherwise treat as plain string
+            correctAnswerArray = Array.isArray(parsed) ? parsed.map(String) : [String(parsed)];
           } catch {
             // If parsing fails, treat as plain string (e.g., "③")
             correctAnswerArray = [question.answer];
@@ -506,17 +508,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (studentAnswer) {
           let correctAnswerArray: string[];
           try {
-            correctAnswerArray = JSON.parse(question.answer) as string[];
+            const parsed = JSON.parse(question.answer);
+            // Only use parsed result if it's an array, otherwise treat as plain string
+            correctAnswerArray = Array.isArray(parsed) ? parsed.map(String) : [String(parsed)];
           } catch {
             correctAnswerArray = [question.answer];
           }
+          
+          const normalizedStudentAnswer = normalizeAnswer(studentAnswer.answer);
+          const normalizedCorrectAnswer = normalizeAnswer(correctAnswerArray[0]);
           
           if (question.isMultipleAnswer) {
             const studentAnswerList = studentAnswer.answer.split(',').map((a: string) => normalizeAnswer(a)).sort();
             const correctAnswerList = correctAnswerArray.map((a: string) => normalizeAnswer(a)).sort();
             isCorrect = JSON.stringify(studentAnswerList) === JSON.stringify(correctAnswerList);
           } else {
-            isCorrect = normalizeAnswer(correctAnswerArray[0]) === normalizeAnswer(studentAnswer.answer);
+            isCorrect = normalizedCorrectAnswer === normalizedStudentAnswer;
           }
 
           if (isCorrect) {

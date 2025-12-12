@@ -217,7 +217,7 @@ export default function TestPage() {
         <Card className="max-w-md">
           <CardContent className="pt-6 text-center space-y-4">
             <p>문제를 불러올 수 없습니다.</p>
-            <Button onClick={() => setLocation("/schools")}>학교 선택으로 돌아가기</Button>
+            <Button onClick={() => setLocation("/units")}>단원 선택으로 돌아가기</Button>
           </CardContent>
         </Card>
       </div>
