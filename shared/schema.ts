@@ -165,6 +165,15 @@ export const submitTestSchema = z.object({
 
 export type SubmitTest = z.infer<typeof submitTestSchema>;
 
+export const submitUnitTestSchema = z.object({
+  studentId: z.string().min(1, "학생 ID가 필요합니다"),
+  studentName: z.string().min(1, "이름이 필요합니다"),
+  unitName: z.string().min(1, "단원명이 필요합니다"),
+  answers: z.array(studentAnswerSchema),
+});
+
+export type SubmitUnitTest = z.infer<typeof submitUnitTestSchema>;
+
 export const loginSchema = z.object({
   studentId: z.string().min(1, "학생 ID를 입력해주세요"),
   studentName: z.string().min(1, "이름을 입력해주세요"),

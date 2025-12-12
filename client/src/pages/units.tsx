@@ -30,7 +30,7 @@ export default function UnitsPage() {
   };
 
   const handleUnitSelect = (unit: string) => {
-    setLocation(`/test/${encodeURIComponent(unit)}`);
+    setLocation(`/test/unit/${encodeURIComponent(unit)}`);
   };
 
   const handleViewReports = () => {
@@ -83,9 +83,9 @@ export default function UnitsPage() {
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-5xl mx-auto space-y-8">
           <div className="text-center space-y-2">
-            <h2 className="text-3xl font-bold">단원 선택</h2>
+            <h2 className="text-3xl font-bold">과제 점검시작</h2>
             <p className="text-muted-foreground">
-              시험을 응시할 단원을 선택해주세요
+              점검할 단원을 선택해주세요
             </p>
           </div>
 
@@ -123,7 +123,7 @@ export default function UnitsPage() {
                       className="w-full group-hover:bg-primary/90"
                       data-testid={`button-start-${index}`}
                     >
-                      시험 시작
+                      과제 점검 시작
                       <ChevronRight className="w-4 h-4 ml-2" />
                     </Button>
                   </CardContent>

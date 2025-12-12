@@ -35,6 +35,7 @@ export interface IStorage {
   
   // Question operations
   getQuestionsByExam(examId: number): Promise<Question[]>;
+  getQuestionsByUnit(unit: string): Promise<Question[]>;
   getAllQuestions(): Promise<Question[]>;
   createQuestion(question: InsertQuestion): Promise<Question>;
   createManyQuestions(questions: InsertQuestion[]): Promise<void>;
@@ -119,6 +120,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(questions)
       .where(eq(questions.examId, examId))
+      .orderBy(questions.questionNumber);
+  }
+
+  async getQuestionsByUnit(unit: string): Promise<Question[]> {
+    return await db
+      .select()
+      .from(questions)
+      .where(eq(questions.unit, unit))
       .orderBy(questions.questionNumber);
   }
 

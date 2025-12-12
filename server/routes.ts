@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { loginSchema, submitTestSchema, type UnitResult } from "@shared/schema";
+import { loginSchema, submitTestSchema, submitUnitTestSchema, type UnitResult } from "@shared/schema";
 import { readExamDataFromSheet, writeExamDataToSheet, writeStudentResultToSheet, readResultsFromSheet, readAllResultsFromSheet } from "./googleSheets";
 import multer from "multer";
 import { spawn } from "child_process";
@@ -124,6 +124,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       return res.status(500).json({
         message: error.message || "문제를 불러오는 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
+  // Get questions by unit
+  app.get("/api/units/:unit/questions", async (req, res) => {
+    try {
+      const unit = decodeURIComponent(req.params.unit);
+      const questions = await storage.getQuestionsByUnit(unit);
+      return res.json(questions);
+    } catch (error: any) {
+      return res.status(500).json({
+        message: error.message || "문제를 불러오는 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
+  // Get question counts by unit
+  app.get("/api/questions/counts", async (req, res) => {
+    try {
+      const allQuestions = await storage.getAllQuestions();
+      const counts: Record<string, number> = {};
+      for (const q of allQuestions) {
+        if (q.unit) {
+          counts[q.unit] = (counts[q.unit] || 0) + 1;
+        }
+      }
+      return res.json(counts);
+    } catch (error: any) {
+      return res.status(500).json({
+        message: error.message || "문제 수를 불러오는 중 오류가 발생했습니다.",
       });
     }
   });
@@ -416,6 +447,128 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Submit test error:', error);
       return res.status(400).json({
         message: error.message || "시험 제출 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
+  // Unit test submission (단원별 과제 제출)
+  app.post("/api/unit-tests/submit", async (req, res) => {
+    try {
+      const { studentId, studentName, unitName, answers } = submitUnitTestSchema.parse(req.body);
+      
+      const questions = await storage.getQuestionsByUnit(unitName);
+      
+      if (questions.length === 0) {
+        return res.status(404).json({
+          message: "해당 단원의 문제를 찾을 수 없습니다.",
+        });
+      }
+
+      const multipleChoiceQuestions = questions.filter(q => q.type === "객관식");
+      const totalQuestions = multipleChoiceQuestions.length;
+      const answeredQuestions = answers.length;
+      
+      let correctAnswers = 0;
+      const unitMap = new Map<string, UnitResult>();
+
+      unitMap.set(unitName, {
+        category: questions[0]?.category || "",
+        unit: unitName,
+        total: totalQuestions,
+        correct: 0,
+        wrong: 0,
+        unanswered: 0,
+        achievementRate: 0,
+      });
+
+      const details = multipleChoiceQuestions.map(question => {
+        const studentAnswer = answers.find((a: { questionNumber: number; answer: string }) => a.questionNumber === question.questionNumber);
+        let isCorrect = false;
+
+        if (studentAnswer) {
+          let correctAnswerArray: string[];
+          try {
+            correctAnswerArray = JSON.parse(question.answer) as string[];
+          } catch {
+            correctAnswerArray = [question.answer];
+          }
+          
+          if (question.isMultipleAnswer) {
+            const studentAnswerList = studentAnswer.answer.split(',').map((a: string) => a.trim()).sort();
+            const correctAnswerList = correctAnswerArray.sort();
+            isCorrect = JSON.stringify(studentAnswerList) === JSON.stringify(correctAnswerList);
+          } else {
+            isCorrect = correctAnswerArray[0] === studentAnswer.answer;
+          }
+
+          if (isCorrect) {
+            correctAnswers++;
+          }
+        }
+
+        const unitResult = unitMap.get(unitName)!;
+        if (studentAnswer) {
+          if (isCorrect) {
+            unitResult.correct++;
+          } else {
+            unitResult.wrong++;
+          }
+        } else {
+          unitResult.unanswered++;
+        }
+
+        return {
+          questionNumber: question.questionNumber,
+          studentAnswer: studentAnswer?.answer || "",
+          correctAnswer: question.answer,
+          isCorrect,
+          isMultipleAnswer: question.isMultipleAnswer,
+        };
+      });
+
+      const unitResults: UnitResult[] = Array.from(unitMap.values()).map(unit => ({
+        ...unit,
+        achievementRate: answeredQuestions > 0 ? Math.round((unit.correct * 100) / answeredQuestions) : 0,
+      }));
+
+      const achievementRate = answeredQuestions > 0 
+        ? Math.round((correctAnswers * 100) / answeredQuestions)
+        : 0;
+
+      const score = achievementRate;
+
+      const allExams = await storage.getAllExams();
+      const runjiExam = allExams.find(e => e.subject === '중등 통합과학 선행');
+      const examId = runjiExam?.id || 0;
+
+      const submission = await storage.createSubmission({
+        studentId,
+        studentName,
+        examId,
+        answers: JSON.stringify(answers),
+        score,
+        totalQuestions,
+        answeredQuestions,
+        correctAnswers,
+        achievementRate,
+        unitResults: JSON.stringify(unitResults),
+      });
+
+      return res.json({
+        submissionId: submission.id,
+        unitName,
+        score,
+        totalQuestions,
+        answeredQuestions,
+        correctAnswers,
+        achievementRate,
+        unitResults,
+        details,
+      });
+    } catch (error: any) {
+      console.error('Unit test submit error:', error);
+      return res.status(400).json({
+        message: error.message || "과제 제출 중 오류가 발생했습니다.",
       });
     }
   });

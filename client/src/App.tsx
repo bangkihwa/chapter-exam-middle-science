@@ -7,8 +7,10 @@ import LoginPage from "@/pages/login";
 import SchoolsPage from "@/pages/schools";
 import ExamsPage from "@/pages/exams";
 import TestPage from "@/pages/test";
+import UnitTestPage from "@/pages/unit-test";
 import ResultPage from "@/pages/result";
 import ReportsPage from "@/pages/reports";
+import UnitsPage from "@/pages/units";
 import AdminLoginPage from "@/pages/admin-login";
 import AdminPage from "@/pages/admin";
 import NotFound from "@/pages/not-found";
@@ -17,6 +19,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={LoginPage} />
+      <Route path="/units" component={UnitsPage} />
+      <Route path="/test/unit/:unit" component={UnitTestPage} />
       <Route path="/schools" component={SchoolsPage} />
       <Route path="/exams/:schoolId" component={ExamsPage} />
       <Route path="/test/:examId" component={TestPage} />

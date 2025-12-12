@@ -34,7 +34,7 @@ export default function LoginPage() {
           title: "로그인 성공",
           description: `${data.student.studentName}님, 환영합니다!`,
         });
-        setLocation("/schools");
+        setLocation("/units");
       }
     },
     onError: (error: any) => {
