@@ -6,17 +6,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  CheckCircle2, XCircle, Home, BarChart3, Trophy, Target, GraduationCap, 
+import {
+  CheckCircle2, XCircle, Home, BarChart3, Trophy, Target, GraduationCap,
   User, TrendingUp, Award, Zap, AlertCircle, BookOpen, Star, Brain,
-  ChevronRight, Activity, FileText
+  ChevronRight, Activity, FileText, Clock
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
   LineChart, Line, Cell
 } from "recharts";
+import { format } from "date-fns";
+import { ko } from "date-fns/locale";
+import { toZonedTime } from "date-fns-tz";
 import type { UnitResult } from "@shared/schema";
 
 interface ResultData {
@@ -28,6 +31,7 @@ interface ResultData {
   achievementRate: number;
   unitResults: UnitResult[];
   examId: number;
+  submittedAt: string;
   details: Array<{
     questionNumber: number;
     studentAnswer: string;
@@ -352,6 +356,12 @@ export default function ResultPage() {
                     <CheckCircle2 className="w-5 h-5 mr-2" />
                     {result.correctAnswers} / {result.answeredQuestions} 정답
                   </Badge>
+                  {result.submittedAt && (
+                    <Badge variant="outline" className="text-lg px-4 py-2">
+                      <Clock className="w-5 h-5 mr-2" />
+                      {format(toZonedTime(new Date(result.submittedAt), 'Asia/Seoul'), 'yyyy-MM-dd HH:mm:ss', { locale: ko })}
+                    </Badge>
+                  )}
                   {isPerfect && (
                     <Badge className="text-xl px-4 py-2 bg-yellow-500 hover:bg-yellow-600">
                       <Star className="w-5 h-5 mr-2" />
@@ -413,14 +423,36 @@ export default function ResultPage() {
                   <div className="p-6 bg-red-500/10 dark:bg-red-500/20 rounded-xl border-2 border-red-500/30">
                     <h3 className="font-bold text-red-700 dark:text-red-400 mb-3 flex items-center gap-2 text-lg">
                       <XCircle className="w-5 h-5" />
-                      틀린 문제 번호 ({wrongQuestions.length}개)
+                      틀린 문제 ({wrongQuestions.length}개)
                     </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {wrongQuestions.map(q => (
-                        <Badge key={q} variant="destructive" className="text-base px-3 py-1 font-mono">
-                          {q}번
-                        </Badge>
-                      ))}
+                    <div className="space-y-2">
+                      {result.details
+                        .filter(d => !d.isCorrect && d.studentAnswer)
+                        .map(d => (
+                          <div key={d.questionNumber} className="p-3 bg-background/50 rounded-lg border border-red-300 dark:border-red-800">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-bold text-base">{d.questionNumber}번</span>
+                              {d.isMultipleAnswer && (
+                                <Badge variant="outline" className="text-xs">복수정답</Badge>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div>
+                                <span className="text-muted-foreground">내 답안: </span>
+                                <span className="font-mono font-semibold text-red-600 dark:text-red-400">
+                                  {d.studentAnswer}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">정답: </span>
+                                <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                                  {d.correctAnswer}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      }
                     </div>
                   </div>
                 )}
