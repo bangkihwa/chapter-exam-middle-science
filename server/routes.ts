@@ -955,34 +955,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/all-results", async (req, res) => {
+  // Get unit statistics
+  app.get("/api/admin/unit-stats", async (req, res) => {
     try {
-      const setting = await storage.getSetting("spreadsheet-id");
-      const spreadsheetId = setting?.value;
-      
-      if (!spreadsheetId) {
-        return res.json([]);
+      const { unit } = req.query;
+
+      if (!unit || typeof unit !== 'string') {
+        return res.status(400).json({
+          message: "단원을 지정해주세요.",
+        });
       }
 
-      console.log(`[Admin] Reading results from Google Sheets (시트3)...`);
-      const results = await readAllResultsFromSheet(spreadsheetId);
-      console.log(`[Admin] Found ${results.length} results in 시트3`);
-      
-      const formattedResults = results.map(result => ({
-        studentId: result.studentId,
-        studentName: result.studentName,
-        textbook: result.exam,
-        unit: result.unit,
-        submittedAt: result.submittedAt,
-        achievementRate: result.achievementRate,
-        feedback: '',
-      }));
-      
+      console.log(`[Admin] Getting stats for unit: ${unit}`);
+
+      // Get all submissions that include this unit
+      const submissions = await db
+        .select({
+          id: schema.submissions.id,
+          studentId: schema.submissions.studentId,
+          studentName: schema.students.name,
+          unitResults: schema.submissions.unitResults,
+          submittedAt: schema.submissions.submittedAt,
+        })
+        .from(schema.submissions)
+        .leftJoin(schema.students, eq(schema.submissions.studentId, schema.students.studentId))
+        .orderBy(desc(schema.submissions.submittedAt));
+
+      // Filter and calculate stats for the specified unit
+      const unitSubmissions: any[] = [];
+      let totalScore = 0;
+      let count = 0;
+
+      for (const submission of submissions) {
+        if (submission.unitResults && Array.isArray(submission.unitResults)) {
+          const unitResult = submission.unitResults.find((ur: any) => ur.unit === unit);
+          if (unitResult) {
+            unitSubmissions.push({
+              studentId: submission.studentId,
+              studentName: submission.studentName || '알 수 없음',
+              achievementRate: unitResult.achievementRate,
+              submittedAt: submission.submittedAt,
+            });
+            totalScore += unitResult.achievementRate || 0;
+            count++;
+          }
+        }
+      }
+
+      const averageScore = count > 0 ? Math.round(totalScore / count) : 0;
+
+      const stats = {
+        unit,
+        totalStudents: count,
+        averageScore,
+        submissions: unitSubmissions,
+      };
+
+      console.log(`[Admin] Unit ${unit} stats: ${count} submissions, avg ${averageScore}`);
+      return res.json(stats);
+    } catch (error: any) {
+      console.error('Error getting unit stats:', error);
+      return res.status(500).json({
+        message: error.message || "단원 통계를 불러오는 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
+  app.get("/api/admin/all-results", async (req, res) => {
+    try {
+      console.log(`[Admin] Reading all results from Supabase...`);
+
+      // Get all submissions with student info and unit results
+      const submissions = await db
+        .select({
+          id: schema.submissions.id,
+          studentId: schema.submissions.studentId,
+          examId: schema.submissions.examId,
+          submittedAt: schema.submissions.submittedAt,
+          score: schema.submissions.score,
+          achievementRate: schema.submissions.achievementRate,
+          studentName: schema.students.name,
+          unitResults: schema.submissions.unitResults,
+        })
+        .from(schema.submissions)
+        .leftJoin(schema.students, eq(schema.submissions.studentId, schema.students.studentId))
+        .orderBy(desc(schema.submissions.submittedAt));
+
+      console.log(`[Admin] Found ${submissions.length} submissions in database`);
+
+      // Flatten unit results for display
+      const formattedResults: any[] = [];
+
+      for (const submission of submissions) {
+        if (submission.unitResults && Array.isArray(submission.unitResults)) {
+          for (const unitResult of submission.unitResults) {
+            formattedResults.push({
+              studentId: submission.studentId,
+              studentName: submission.studentName || '알 수 없음',
+              textbook: unitResult.examName || '중등 과학',
+              unit: unitResult.unit,
+              submittedAt: submission.submittedAt,
+              achievementRate: unitResult.achievementRate,
+              feedback: '',
+            });
+          }
+        }
+      }
+
+      console.log(`[Admin] Formatted ${formattedResults.length} unit results`);
       return res.json(formattedResults);
     } catch (error: any) {
-      console.error('Error reading results from Google Sheets:', error);
+      console.error('Error reading results from database:', error);
       return res.status(500).json({
-        message: error.message || "구글 시트에서 성적을 불러오는 중 오류가 발생했습니다.",
+        message: error.message || "데이터베이스에서 성적을 불러오는 중 오류가 발생했습니다.",
       });
     }
   });
