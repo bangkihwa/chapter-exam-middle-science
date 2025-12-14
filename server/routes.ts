@@ -1,8 +1,10 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { loginSchema, submitTestSchema, submitUnitTestSchema, type UnitResult } from "@shared/schema";
+import { loginSchema, submitTestSchema, submitUnitTestSchema, type UnitResult, submissions, students } from "@shared/schema";
 import { readExamDataFromSheet, writeExamDataToSheet, writeStudentResultToSheet, readResultsFromSheet, readAllResultsFromSheet } from "./googleSheets";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 
 const SPREADSHEET_ID = "1Mi70D_RLWqSCqmlCl2t_yUfdiByF1ExXkLrn7SQcv7k";
 
@@ -969,26 +971,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[Admin] Getting stats for unit: ${unit}`);
 
       // Get all submissions that include this unit
-      const submissions = await db
+      const allSubmissions = await db
         .select({
-          id: schema.submissions.id,
-          studentId: schema.submissions.studentId,
-          studentName: schema.students.name,
-          unitResults: schema.submissions.unitResults,
-          submittedAt: schema.submissions.submittedAt,
+          id: submissions.id,
+          studentId: submissions.studentId,
+          studentName: students.studentName,
+          unitResults: submissions.unitResults,
+          submittedAt: submissions.submittedAt,
         })
-        .from(schema.submissions)
-        .leftJoin(schema.students, eq(schema.submissions.studentId, schema.students.studentId))
-        .orderBy(desc(schema.submissions.submittedAt));
+        .from(submissions)
+        .leftJoin(students, eq(submissions.studentId, students.studentId))
+        .orderBy(desc(submissions.submittedAt));
 
       // Filter and calculate stats for the specified unit
       const unitSubmissions: any[] = [];
       let totalScore = 0;
       let count = 0;
 
-      for (const submission of submissions) {
-        if (submission.unitResults && Array.isArray(submission.unitResults)) {
-          const unitResult = submission.unitResults.find((ur: any) => ur.unit === unit);
+      for (const submission of allSubmissions) {
+        // Parse unitResults if it's a string
+        let unitResultsArray = submission.unitResults;
+        if (typeof unitResultsArray === 'string') {
+          try {
+            unitResultsArray = JSON.parse(unitResultsArray);
+          } catch (e) {
+            console.error('Failed to parse unitResults:', e);
+            continue;
+          }
+        }
+
+        if (unitResultsArray && Array.isArray(unitResultsArray)) {
+          const unitResult = unitResultsArray.find((ur: any) => ur.unit === unit);
           if (unitResult) {
             unitSubmissions.push({
               studentId: submission.studentId,
@@ -1026,29 +1039,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[Admin] Reading all results from Supabase...`);
 
       // Get all submissions with student info and unit results
-      const submissions = await db
+      const allSubmissions = await db
         .select({
-          id: schema.submissions.id,
-          studentId: schema.submissions.studentId,
-          examId: schema.submissions.examId,
-          submittedAt: schema.submissions.submittedAt,
-          score: schema.submissions.score,
-          achievementRate: schema.submissions.achievementRate,
-          studentName: schema.students.name,
-          unitResults: schema.submissions.unitResults,
+          id: submissions.id,
+          studentId: submissions.studentId,
+          examId: submissions.examId,
+          submittedAt: submissions.submittedAt,
+          score: submissions.score,
+          achievementRate: submissions.achievementRate,
+          studentName: students.studentName,
+          unitResults: submissions.unitResults,
         })
-        .from(schema.submissions)
-        .leftJoin(schema.students, eq(schema.submissions.studentId, schema.students.studentId))
-        .orderBy(desc(schema.submissions.submittedAt));
+        .from(submissions)
+        .leftJoin(students, eq(submissions.studentId, students.studentId))
+        .orderBy(desc(submissions.submittedAt));
 
-      console.log(`[Admin] Found ${submissions.length} submissions in database`);
+      console.log(`[Admin] Found ${allSubmissions.length} submissions in database`);
 
       // Flatten unit results for display
       const formattedResults: any[] = [];
 
-      for (const submission of submissions) {
-        if (submission.unitResults && Array.isArray(submission.unitResults)) {
-          for (const unitResult of submission.unitResults) {
+      for (const submission of allSubmissions) {
+        // Parse unitResults if it's a string
+        let unitResultsArray = submission.unitResults;
+        if (typeof unitResultsArray === 'string') {
+          try {
+            unitResultsArray = JSON.parse(unitResultsArray);
+          } catch (e) {
+            console.error('Failed to parse unitResults:', e);
+            continue;
+          }
+        }
+
+        if (unitResultsArray && Array.isArray(unitResultsArray)) {
+          for (const unitResult of unitResultsArray) {
             formattedResults.push({
               studentId: submission.studentId,
               studentName: submission.studentName || '알 수 없음',

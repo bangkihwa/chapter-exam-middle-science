@@ -38,7 +38,14 @@ interface UnitStats {
   unit: string;
   totalQuestions: number;
   totalStudents: number;
+  averageScore: number;
   questionStats: QuestionStat[];
+  submissions: Array<{
+    studentId: string;
+    studentName: string;
+    achievementRate: number;
+    submittedAt: string;
+  }>;
 }
 
 export default function AdminPage() {
@@ -65,7 +72,7 @@ export default function AdminPage() {
   });
 
   const { data: unitStats, isLoading: statsLoading } = useQuery<UnitStats>({
-    queryKey: ["/api/admin/unit-stats", selectedUnit],
+    queryKey: [`/api/admin/unit-stats?unit=${encodeURIComponent(selectedUnit)}`],
     enabled: !!selectedUnit,
   });
 
@@ -301,12 +308,95 @@ export default function AdminPage() {
           </div>
 
           {/* 탭 메뉴 */}
-          <Tabs defaultValue="students" className="space-y-6">
+          <Tabs defaultValue="recent" className="space-y-6">
             <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="recent">최근 응시 현황</TabsTrigger>
               <TabsTrigger value="students">학생 검색 및 성적</TabsTrigger>
               <TabsTrigger value="questions">단원별 오답 분석</TabsTrigger>
-              <TabsTrigger value="settings">시스템 설정</TabsTrigger>
             </TabsList>
+
+            {/* 최근 응시 현황 */}
+            <TabsContent value="recent" className="space-y-4">
+              <Card className="shadow-lg">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="w-6 h-6" />
+                    최근 8일 응시 현황
+                  </CardTitle>
+                  <CardDescription>
+                    최근 8일 동안 응시한 모든 학생들의 성적
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {allResults && allResults.length > 0 ? (
+                    <div className="space-y-3">
+                      {allResults
+                        .filter(result => {
+                          const submittedDate = new Date(result.submittedAt);
+                          const eightDaysAgo = new Date();
+                          eightDaysAgo.setDate(eightDaysAgo.getDate() - 8);
+                          return submittedDate >= eightDaysAgo;
+                        })
+                        .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
+                        .map((result, index) => {
+                          const gradeColor = result.achievementRate >= 90 ? "text-green-600" :
+                                            result.achievementRate >= 80 ? "text-blue-600" :
+                                            result.achievementRate >= 70 ? "text-yellow-600" :
+                                            result.achievementRate >= 60 ? "text-orange-600" : "text-red-600";
+                          const gradeBg = result.achievementRate >= 90 ? "bg-green-500/10" :
+                                         result.achievementRate >= 80 ? "bg-blue-500/10" :
+                                         result.achievementRate >= 70 ? "bg-yellow-500/10" :
+                                         result.achievementRate >= 60 ? "bg-orange-500/10" : "bg-red-500/10";
+
+                          return (
+                            <div
+                              key={`${result.studentId}-${result.unit}-${result.submittedAt}`}
+                              className={`flex items-center gap-4 p-4 rounded-lg border-2 ${gradeBg}`}
+                            >
+                              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 font-bold text-primary flex-shrink-0">
+                                {index + 1}
+                              </div>
+                              <div className="flex-1 grid md:grid-cols-4 gap-4">
+                                <div>
+                                  <p className="text-sm text-muted-foreground">학생</p>
+                                  <p className="font-semibold">{result.studentName}</p>
+                                  <p className="text-xs text-muted-foreground">{result.studentId}</p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">단원</p>
+                                  <p className="font-semibold text-sm">{result.unit}</p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">응시 일시</p>
+                                  <p className="text-sm">
+                                    {new Date(result.submittedAt).toLocaleString('ko-KR', {
+                                      timeZone: 'Asia/Seoul',
+                                      month: '2-digit',
+                                      day: '2-digit',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">성취율</p>
+                                  <Badge className={`${gradeBg} ${gradeColor} font-mono text-lg`}>
+                                    {result.achievementRate}점
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  ) : (
+                    <p className="text-center text-muted-foreground py-8">
+                      최근 8일 동안 응시한 기록이 없습니다
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
 
             {/* 학생 검색 및 성적 */}
             <TabsContent value="students" className="space-y-4">
@@ -467,7 +557,7 @@ export default function AdminPage() {
                 <CardHeader>
                   <CardTitle>단원 선택</CardTitle>
                   <CardDescription>
-                    분석할 단원을 선택하세요 (구글 시트 데이터 기반)
+                    분석할 단원을 선택하세요
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -488,8 +578,77 @@ export default function AdminPage() {
 
               {statsLoading ? (
                 <Skeleton className="h-96" />
-              ) : unitStats && unitStats.questionStats.length > 0 ? (
-                <Card className="shadow-lg border-2 border-red-500/20">
+              ) : unitStats && unitStats.submissions && unitStats.submissions.length > 0 ? (
+                <>
+                  {/* 단원별 응시 학생 목록 */}
+                  <Card className="shadow-lg border-2 border-blue-500/20">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Users className="w-6 h-6 text-blue-600" />
+                        {selectedUnit} - 응시 학생 목록
+                      </CardTitle>
+                      <CardDescription>
+                        총 {unitStats.totalStudents}명 응시 / 평균 점수: {unitStats.averageScore}점
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {unitStats.submissions
+                          .sort((a, b) => b.achievementRate - a.achievementRate)
+                          .map((submission, index) => {
+                            const gradeColor = submission.achievementRate >= 90 ? "text-green-600" :
+                                              submission.achievementRate >= 80 ? "text-blue-600" :
+                                              submission.achievementRate >= 70 ? "text-yellow-600" :
+                                              submission.achievementRate >= 60 ? "text-orange-600" : "text-red-600";
+                            const gradeBg = submission.achievementRate >= 90 ? "bg-green-500/10" :
+                                           submission.achievementRate >= 80 ? "bg-blue-500/10" :
+                                           submission.achievementRate >= 70 ? "bg-yellow-500/10" :
+                                           submission.achievementRate >= 60 ? "bg-orange-500/10" : "bg-red-500/10";
+
+                            return (
+                              <div
+                                key={`${submission.studentId}-${submission.submittedAt}`}
+                                className={`flex items-center gap-4 p-4 rounded-lg border-2 ${gradeBg}`}
+                              >
+                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 font-bold text-primary flex-shrink-0">
+                                  {index + 1}
+                                </div>
+                                <div className="flex-1 grid md:grid-cols-3 gap-4">
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">학생</p>
+                                    <p className="font-semibold">{submission.studentName}</p>
+                                    <p className="text-xs text-muted-foreground">{submission.studentId}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">응시 일시</p>
+                                    <p className="text-sm">
+                                      {new Date(submission.submittedAt).toLocaleString('ko-KR', {
+                                        timeZone: 'Asia/Seoul',
+                                        year: 'numeric',
+                                        month: '2-digit',
+                                        day: '2-digit',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">성취율</p>
+                                    <Badge className={`${gradeBg} ${gradeColor} font-mono text-lg`}>
+                                      {submission.achievementRate}점
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* 오답 분석 */}
+                  {unitStats.questionStats && unitStats.questionStats.length > 0 && (
+                    <Card className="shadow-lg border-2 border-red-500/20">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <AlertCircle className="w-6 h-6 text-red-600" />
@@ -574,7 +733,9 @@ export default function AdminPage() {
                       ))}
                     </div>
                   </CardContent>
-                </Card>
+                    </Card>
+                  )}
+                </>
               ) : (
                 <Card className="shadow-lg">
                   <CardContent className="py-12 text-center">
@@ -585,126 +746,6 @@ export default function AdminPage() {
                   </CardContent>
                 </Card>
               )}
-            </TabsContent>
-
-            {/* 시스템 설정 */}
-            <TabsContent value="settings" className="space-y-4">
-              <Card className="shadow-lg border-2 border-primary/20">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Settings2 className="w-6 h-6" />
-                    구글 시트 연동 설정
-                  </CardTitle>
-                  <CardDescription>
-                    학생 정보와 시험 결과를 동기화할 구글 시트 ID를 설정하세요
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <label htmlFor="spreadsheet-id" className="text-sm font-medium">
-                      구글 시트 ID
-                    </label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="spreadsheet-id"
-                        placeholder="예: 1Abc2Def3Ghi4Jkl5Mno6Pqr7Stu8Vwx9Yz0"
-                        value={spreadsheetIdInput}
-                        onChange={(e) => setSpreadsheetIdInput(e.target.value)}
-                        data-testid="input-spreadsheet-id"
-                        className="flex-1 font-mono text-sm"
-                      />
-                      <Button
-                        onClick={handleSaveSpreadsheetId}
-                        disabled={saveSpreadsheetIdMutation.isPending}
-                        data-testid="button-save-spreadsheet-id"
-                      >
-                        {saveSpreadsheetIdMutation.isPending ? "저장 중..." : "저장"}
-                      </Button>
-                    </div>
-                    {spreadsheetSettings?.source && (
-                      <p className="text-sm text-muted-foreground">
-                        <LinkIcon className="w-3 h-3 inline mr-1" />
-                        현재 설정 위치: {
-                          spreadsheetSettings.source === "database" ? "데이터베이스 (이 화면에서 설정됨)" :
-                          spreadsheetSettings.source === "environment" ? "환경 변수 (개발 환경)" :
-                          "설정되지 않음"
-                        }
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="pt-4 border-t space-y-2">
-                    <h4 className="font-semibold">📖 구글 시트 ID 찾는 방법:</h4>
-                    <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
-                      <li>구글 시트를 엽니다</li>
-                      <li>URL에서 /d/ 와 /edit 사이의 문자열을 복사합니다</li>
-                      <li>예: https://docs.google.com/spreadsheets/d/<strong className="text-foreground">여기가_ID</strong>/edit</li>
-                    </ol>
-                  </div>
-
-                  <div className="pt-4 border-t space-y-2">
-                    <h4 className="font-semibold">✅ 설정 완료 후:</h4>
-                    <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
-                      <li>상단의 <strong className="text-foreground">"학생 동기화"</strong> 버튼을 클릭하세요</li>
-                      <li>구글 시트의 학생 정보가 데이터베이스로 복사됩니다</li>
-                      <li>학생들이 로그인할 수 있습니다!</li>
-                    </ol>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-lg border-2 border-orange-500/20">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Database className="w-6 h-6" />
-                    문제 데이터 초기화
-                  </CardTitle>
-                  <CardDescription>
-                    데이터베이스에 물리학 프리미엄 16개 단원의 모든 문제를 저장합니다
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg">
-                    <p className="text-sm font-medium mb-2">⚠️ 언제 사용하나요?</p>
-                    <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                      <li>배포 직후 데이터베이스가 비어있을 때</li>
-                      <li>학생들이 시험을 볼 수 없다고 할 때</li>
-                      <li>"문제를 불러올 수 없습니다" 오류가 발생할 때</li>
-                    </ul>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={handleInitData}
-                      disabled={initDataMutation.isPending}
-                      variant="default"
-                      className="flex-1"
-                      data-testid="button-init-data"
-                    >
-                      <Database className={`w-4 h-4 mr-2 ${initDataMutation.isPending ? 'animate-pulse' : ''}`} />
-                      {initDataMutation.isPending ? "초기화 중..." : "문제 데이터 초기화"}
-                    </Button>
-                  </div>
-
-                  <div className="pt-4 border-t space-y-2">
-                    <h4 className="font-semibold">📝 초기화 내용:</h4>
-                    <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                      <li>16개 단원의 모든 객관식/주관식 문제</li>
-                      <li>각 문제의 정답 및 메타데이터</li>
-                      <li>총 960개의 문제 데이터</li>
-                    </ul>
-                  </div>
-
-                  <div className="pt-4 border-t space-y-2">
-                    <h4 className="font-semibold">✅ 초기화 완료 후:</h4>
-                    <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
-                      <li>학생들이 모든 단원의 시험을 볼 수 있습니다</li>
-                      <li>OMR 답안 입력 화면이 정상 표시됩니다</li>
-                      <li>즉시 채점 및 성적 분석이 가능합니다</li>
-                    </ol>
-                  </div>
-                </CardContent>
-              </Card>
             </TabsContent>
           </Tabs>
         </div>
