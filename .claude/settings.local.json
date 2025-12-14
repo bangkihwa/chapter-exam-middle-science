@@ -19,7 +19,11 @@
       "Bash(git commit:*)",
       "Bash(git branch:*)",
       "Bash(git push:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(npx drizzle-kit:*)",
+      "Bash(git init:*)",
+      "Bash(git reset:*)",
+      "Bash(git fetch:*)"
     ],
     "deny": [],
     "ask": []
