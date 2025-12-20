@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   CheckCircle2, XCircle, Home, BarChart3, Trophy, Target, GraduationCap,
   User, TrendingUp, Award, Zap, AlertCircle, BookOpen, Star, Brain,
-  ChevronRight, Activity, FileText, Clock
+  ChevronRight, Activity, FileText, Clock, PieChart as PieChartIcon, X
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -21,6 +21,7 @@ import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { toZonedTime } from "date-fns-tz";
 import type { UnitResult } from "@shared/schema";
+import ExamAnalysis from "@/components/exam-analysis";
 
 interface ResultData {
   submissionId: number;
@@ -49,6 +50,8 @@ interface UnitStats {
   studentCount: number;
 }
 
+const COLORS = ['#3b82f6', '#22c55e', '#ef4444', '#f97316', '#a855f7', '#eab308', '#14b8a6', '#ec4899'];
+
 export default function ResultPage() {
   const [, setLocation] = useLocation();
   const [result, setResult] = useState<ResultData | null>(null);
@@ -75,56 +78,56 @@ export default function ResultPage() {
   const isPerfect = result.correctAnswers === result.answeredQuestions;
   const incorrectAnswers = result.answeredQuestions - result.correctAnswers;
   const unansweredQuestions = result.totalQuestions - result.answeredQuestions;
-  
+
   const getGrade = (rate: number) => {
-    if (rate === 100) return { 
-      grade: "S", 
-      color: "text-yellow-600 dark:text-yellow-400", 
-      bgColor: "bg-yellow-500/20", 
+    if (rate === 100) return {
+      grade: "S",
+      color: "text-yellow-600 dark:text-yellow-400",
+      bgColor: "bg-yellow-500/20",
       borderColor: "border-yellow-500",
-      desc: "완벽" 
+      desc: "완벽"
     };
-    if (rate >= 90) return { 
-      grade: "A+", 
-      color: "text-green-600 dark:text-green-400", 
-      bgColor: "bg-green-500/20", 
+    if (rate >= 90) return {
+      grade: "A+",
+      color: "text-green-600 dark:text-green-400",
+      bgColor: "bg-green-500/20",
       borderColor: "border-green-500",
-      desc: "우수" 
+      desc: "우수"
     };
-    if (rate >= 80) return { 
-      grade: "A", 
-      color: "text-green-600 dark:text-green-500", 
-      bgColor: "bg-green-500/20", 
+    if (rate >= 80) return {
+      grade: "A",
+      color: "text-green-600 dark:text-green-500",
+      bgColor: "bg-green-500/20",
       borderColor: "border-green-500",
-      desc: "우수" 
+      desc: "우수"
     };
-    if (rate >= 70) return { 
-      grade: "B+", 
-      color: "text-blue-600 dark:text-blue-400", 
-      bgColor: "bg-blue-500/20", 
+    if (rate >= 70) return {
+      grade: "B+",
+      color: "text-blue-600 dark:text-blue-400",
+      bgColor: "bg-blue-500/20",
       borderColor: "border-blue-500",
-      desc: "양호" 
+      desc: "양호"
     };
-    if (rate >= 60) return { 
-      grade: "B", 
-      color: "text-blue-600 dark:text-blue-500", 
-      bgColor: "bg-blue-500/20", 
+    if (rate >= 60) return {
+      grade: "B",
+      color: "text-blue-600 dark:text-blue-500",
+      bgColor: "bg-blue-500/20",
       borderColor: "border-blue-500",
-      desc: "양호" 
+      desc: "양호"
     };
-    if (rate >= 50) return { 
-      grade: "C", 
-      color: "text-orange-600 dark:text-orange-400", 
-      bgColor: "bg-orange-500/20", 
+    if (rate >= 50) return {
+      grade: "C",
+      color: "text-orange-600 dark:text-orange-400",
+      bgColor: "bg-orange-500/20",
       borderColor: "border-orange-500",
-      desc: "보통" 
+      desc: "보통"
     };
-    return { 
-      grade: "D", 
-      color: "text-red-600 dark:text-red-400", 
-      bgColor: "bg-red-500/20", 
+    return {
+      grade: "D",
+      color: "text-red-600 dark:text-red-400",
+      bgColor: "bg-red-500/20",
       borderColor: "border-red-500",
-      desc: "노력 필요" 
+      desc: "노력필요"
     };
   };
 
@@ -198,7 +201,6 @@ export default function ResultPage() {
 
     const guidance = [];
 
-    // Overall assessment
     if (totalRate >= 90) {
       guidance.push({
         type: "excellent",
@@ -233,7 +235,6 @@ export default function ResultPage() {
       });
     }
 
-    // Strong units
     if (strongUnits.length > 0) {
       guidance.push({
         type: "strength",
@@ -244,7 +245,6 @@ export default function ResultPage() {
       });
     }
 
-    // Moderate units
     if (moderateUnits.length > 0) {
       guidance.push({
         type: "moderate",
@@ -255,7 +255,6 @@ export default function ResultPage() {
       });
     }
 
-    // Weak units
     if (weakUnits.length > 0) {
       guidance.push({
         type: "weak",
@@ -266,7 +265,6 @@ export default function ResultPage() {
       });
     }
 
-    // Time management
     if (unansweredQuestions > 0) {
       guidance.push({
         type: "time",
@@ -280,7 +278,7 @@ export default function ResultPage() {
     return guidance;
   };
 
-  // Filter out units with no answered questions (응시하지 않은 단원 제외)
+  // Filter out units with no answered questions
   const answeredUnitResults = result.unitResults.filter(unit => {
     const answered = unit.correct + unit.wrong;
     return answered > 0;
@@ -289,15 +287,12 @@ export default function ResultPage() {
   const studentFeedback = getDetailedStudentFeedback(result.achievementRate, answeredUnitResults);
   const teacherGuidance = getTeacherGuidance(answeredUnitResults, result.achievementRate);
 
-  // 단원명 축약 함수
   const shortenUnitName = (name: string, maxLen: number = 6): string => {
-    // 괄호 내용 제거하고 축약
     const withoutParens = name.replace(/\s*\([^)]*\)/g, '');
     if (withoutParens.length <= maxLen) return withoutParens;
     return withoutParens.substring(0, maxLen) + '...';
   };
 
-  // Prepare chart data
   const chartData = answeredUnitResults.map(unit => ({
     name: shortenUnitName(unit.unit),
     fullName: unit.unit,
@@ -313,95 +308,183 @@ export default function ResultPage() {
     fullMark: 100,
   }));
 
-  const wrongQuestions = result.details
+  const wrongQuestions = (result.details || [])
     .filter(d => !d.isCorrect && d.studentAnswer)
     .map(d => d.questionNumber)
     .sort((a, b) => a - b);
 
-  const unansweredList = result.details
+  const unansweredList = (result.details || [])
     .filter(d => !d.studentAnswer)
     .map(d => d.questionNumber)
     .sort((a, b) => a - b);
 
-  const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+  // 난이도별 분류 계산
+  const highScores = answeredUnitResults.filter(u => u.achievementRate >= 70).length;
+  const mediumScores = answeredUnitResults.filter(u => u.achievementRate >= 50 && u.achievementRate < 70).length;
+  const lowScores = answeredUnitResults.filter(u => u.achievementRate < 50).length;
+  const totalUnits = answeredUnitResults.length;
+  const highPercentage = totalUnits > 0 ? Math.round((highScores / totalUnits) * 100) : 0;
+  const mediumPercentage = totalUnits > 0 ? Math.round((mediumScores / totalUnits) * 100) : 0;
+  const lowPercentage = totalUnits > 0 ? Math.round((lowScores / totalUnits) * 100) : 0;
+
+  // 단원별 출제 분포 데이터
+  const unitDistribution = answeredUnitResults
+    .map((unit, index) => ({
+      name: shortenUnitName(unit.unit, 8),
+      fullName: unit.unit,
+      문항수: unit.total,
+      비중: result.totalQuestions > 0 ? Math.round((unit.total / result.totalQuestions) * 1000) / 10 : 0,
+      color: COLORS[index % COLORS.length],
+    }))
+    .sort((a, b) => b.문항수 - a.문항수);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="space-y-6">
-          {/* Header Card - 성적 요약 */}
-          <Card className={`border-2 shadow-2xl ${gradeInfo.borderColor}`}>
-            <CardHeader className="text-center space-y-6 pb-8">
-              <div className="flex justify-center">
-                <div className={`w-40 h-40 rounded-full flex flex-col items-center justify-center ${gradeInfo.bgColor} border-4 ${gradeInfo.borderColor} shadow-xl`}>
-                  <Trophy className={`w-16 h-16 ${gradeInfo.color} mb-2`} />
-                  <span className={`text-5xl font-bold ${gradeInfo.color}`}>
+        <div className="space-y-8">
+          {/* Hero Section - 스크린샷 스타일 */}
+          <Card className="border-2 border-primary/20 shadow-2xl bg-gradient-to-br from-white via-gray-50 to-white dark:from-gray-800 dark:via-gray-900 dark:to-gray-800">
+            <CardHeader className="text-center pb-6">
+              <div className="flex justify-center mb-6">
+                <div className={`w-32 h-32 rounded-full flex flex-col items-center justify-center ${gradeInfo.bgColor} border-4 ${gradeInfo.borderColor} shadow-xl`}>
+                  <Trophy className={`w-10 h-10 ${gradeInfo.color} mb-1`} />
+                  <span className={`text-4xl font-bold ${gradeInfo.color}`}>
                     {gradeInfo.grade}
                   </span>
-                  <span className={`text-sm ${gradeInfo.color} mt-1`}>
+                  <span className={`text-xs ${gradeInfo.color} mt-1`}>
                     {gradeInfo.desc}
                   </span>
                 </div>
               </div>
-              <div>
-                <CardTitle className="text-4xl font-bold mb-3">
-                  시험 결과 분석
-                </CardTitle>
-                <div className="flex justify-center gap-4 text-lg flex-wrap">
-                  <Badge variant="outline" className="text-xl font-mono px-4 py-2">
-                    <Award className="w-5 h-5 mr-2" />
-                    {result.achievementRate}점
-                  </Badge>
-                  <Badge variant="secondary" className="text-xl px-4 py-2">
-                    <CheckCircle2 className="w-5 h-5 mr-2" />
-                    {result.correctAnswers} / {result.answeredQuestions} 정답
-                  </Badge>
-                  {result.submittedAt && (
-                    <Badge variant="outline" className="text-lg px-4 py-2">
-                      <Clock className="w-5 h-5 mr-2" />
-                      {format(toZonedTime(new Date(result.submittedAt), 'Asia/Seoul'), 'yyyy-MM-dd HH:mm:ss', { locale: ko })}
-                    </Badge>
-                  )}
-                  {isPerfect && (
-                    <Badge className="text-xl px-4 py-2 bg-yellow-500 hover:bg-yellow-600">
-                      <Star className="w-5 h-5 mr-2" />
-                      Perfect Score!
-                    </Badge>
-                  )}
-                </div>
-              </div>
+              <CardTitle className="text-3xl font-bold mb-3">
+                통합과학 | 체계적 시험 분석 및 대비 전략 리포트
+              </CardTitle>
+              <CardDescription className="text-base">
+                총 문항 수: <span className="font-bold text-foreground">{result.totalQuestions}문항</span> |
+                객관식: <span className="font-bold text-foreground">{result.totalQuestions}문항</span> |
+                전체 난이도: <span className={`font-bold ${gradeInfo.color}`}>{gradeInfo.desc}</span>
+              </CardDescription>
+              {result.submittedAt && (
+                <Badge variant="outline" className="mt-3 text-sm px-4 py-2">
+                  <Clock className="w-4 h-4 mr-2" />
+                  {format(toZonedTime(new Date(result.submittedAt), 'Asia/Seoul'), 'yyyy-MM-dd HH:mm:ss', { locale: ko })}
+                </Badge>
+              )}
             </CardHeader>
 
-            <CardContent className="space-y-8">
-              {/* 통계 그리드 */}
-              <div className="grid grid-cols-3 gap-6">
-                <div className="text-center p-6 bg-green-500/10 dark:bg-green-500/20 rounded-xl border-2 border-green-500/30 hover-elevate">
-                  <CheckCircle2 className="w-12 h-12 text-green-600 dark:text-green-400 mx-auto mb-3" />
-                  <div className="text-4xl font-bold text-green-600 dark:text-green-400 mb-1">
-                    {result.correctAnswers}
-                  </div>
-                  <div className="text-sm text-muted-foreground font-medium">정답</div>
+            <CardContent>
+              {/* 주요 통계 그리드 - 스크린샷 스타일 */}
+              <div className="grid grid-cols-4 gap-4 mb-6">
+                <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                  <BarChart3 className="w-10 h-10 text-blue-500 mx-auto mb-3" />
+                  <div className="text-3xl font-bold text-blue-600 mb-1">{answeredUnitResults.length}</div>
+                  <div className="text-sm text-muted-foreground font-medium">시험 본 단원 수</div>
                 </div>
 
-                <div className="text-center p-6 bg-red-500/10 dark:bg-red-500/20 rounded-xl border-2 border-red-500/30 hover-elevate">
-                  <XCircle className="w-12 h-12 text-red-600 dark:text-red-400 mx-auto mb-3" />
-                  <div className="text-4xl font-bold text-red-600 dark:text-red-400 mb-1">
-                    {incorrectAnswers}
-                  </div>
-                  <div className="text-sm text-muted-foreground font-medium">오답</div>
+                <div className="text-center p-6 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/30 dark:to-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
+                  <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto mb-3" />
+                  <div className="text-3xl font-bold text-green-600 mb-1">{result.correctAnswers}</div>
+                  <div className="text-sm text-muted-foreground font-medium">총 정답 수</div>
                 </div>
 
-                <div className="text-center p-6 bg-gray-500/10 dark:bg-gray-500/20 rounded-xl border-2 border-gray-500/30 hover-elevate">
-                  <FileText className="w-12 h-12 text-gray-600 dark:text-gray-400 mx-auto mb-3" />
-                  <div className="text-4xl font-bold text-gray-600 dark:text-gray-400 mb-1">
-                    {unansweredQuestions}
+                <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/30 dark:to-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
+                  <FileText className="w-10 h-10 text-purple-500 mx-auto mb-3" />
+                  <div className="text-3xl font-bold text-purple-600 mb-1">{result.totalQuestions}</div>
+                  <div className="text-sm text-muted-foreground font-medium">시험 본 총 문항 수</div>
+                </div>
+
+                <div className="text-center p-6 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/30 dark:to-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-800">
+                  <Target className="w-10 h-10 text-orange-500 mx-auto mb-3" />
+                  <div className="text-3xl font-bold text-orange-600 mb-1">{result.achievementRate}%</div>
+                  <div className="text-sm text-muted-foreground font-medium">전체 난이도</div>
+                </div>
+              </div>
+
+              {/* 전체 난이도 분포 - 스크린샷 스타일 */}
+              <div className="p-6 bg-white dark:bg-gray-900 rounded-xl border shadow-sm mb-6">
+                <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-primary" />
+                  전체 난이도 분포
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="font-medium flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full bg-green-500"></span>
+                        하 (기본) - {highScores}문항
+                      </span>
+                      <span className="font-mono font-bold text-green-600">{highPercentage}%</span>
+                    </div>
+                    <div className="relative h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                      <div
+                        className="absolute left-0 top-0 h-full bg-blue-500 rounded-full"
+                        style={{ width: `${Math.min(highPercentage, 100)}%` }}
+                      />
+                      <div
+                        className="absolute top-0 h-full bg-green-400 rounded-full"
+                        style={{ left: `${Math.min(highPercentage, 100)}%`, width: `${highPercentage}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="text-sm text-muted-foreground font-medium">시험범위 외</div>
+                  <div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="font-medium flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full bg-orange-500"></span>
+                        중 (보통) - {mediumScores}문항
+                      </span>
+                      <span className="font-mono font-bold text-orange-600">{mediumPercentage}%</span>
+                    </div>
+                    <div className="relative h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                      <div
+                        className="absolute left-0 top-0 h-full bg-blue-500 rounded-full"
+                        style={{ width: `${Math.min(mediumPercentage * 1.5, 100)}%` }}
+                      />
+                      <div
+                        className="absolute top-0 h-full bg-orange-300 rounded-full"
+                        style={{ left: `${Math.min(mediumPercentage * 1.5, 100)}%`, width: `${mediumPercentage}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="font-medium flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full bg-red-500"></span>
+                        상 (어려움) - {lowScores}문항
+                      </span>
+                      <span className="font-mono font-bold text-red-600">{lowPercentage}%</span>
+                    </div>
+                    <div className="relative h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                      <div
+                        className="absolute left-0 top-0 h-full bg-blue-500 rounded-full"
+                        style={{ width: `${Math.min(lowPercentage * 2, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 통계 그리드 - 정답/오답/범위외 */}
+              <div className="grid grid-cols-4 gap-4 mb-6">
+                <div className="text-center p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border">
+                  <div className="text-2xl font-bold">{result.totalQuestions}</div>
+                  <div className="text-xs text-muted-foreground">총 문항</div>
+                </div>
+                <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
+                  <div className="text-2xl font-bold text-green-600">{result.correctAnswers}</div>
+                  <div className="text-xs text-muted-foreground">정답</div>
+                </div>
+                <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800">
+                  <div className="text-2xl font-bold text-red-600">{incorrectAnswers}</div>
+                  <div className="text-xs text-muted-foreground">오답</div>
+                </div>
+                <div className="text-center p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border">
+                  <div className="text-2xl font-bold">{unansweredQuestions}</div>
+                  <div className="text-xs text-muted-foreground">범위 외</div>
                 </div>
               </div>
 
               {/* 응답률 프로그레스 */}
-              <div className="space-y-3 p-6 bg-card/50 rounded-xl border">
+              <div className="space-y-3 p-4 bg-card/50 rounded-xl border mb-6">
                 <div className="flex justify-between text-sm">
                   <span className="font-semibold flex items-center gap-2">
                     <Activity className="w-4 h-4" />
@@ -411,25 +494,25 @@ export default function ResultPage() {
                     {result.answeredQuestions} / {result.totalQuestions} ({Math.round((result.answeredQuestions / result.totalQuestions) * 100)}%)
                   </span>
                 </div>
-                <Progress 
-                  value={(result.answeredQuestions / result.totalQuestions) * 100} 
-                  className="h-4" 
+                <Progress
+                  value={(result.answeredQuestions / result.totalQuestions) * 100}
+                  className="h-3"
                 />
               </div>
 
               {/* 틀린 문제 & 시험범위 외 */}
               <div className="grid md:grid-cols-2 gap-4">
-                {wrongQuestions.length > 0 && (
-                  <div className="p-6 bg-red-500/10 dark:bg-red-500/20 rounded-xl border-2 border-red-500/30">
+                {wrongQuestions.length > 0 && result.details && result.details.length > 0 && (
+                  <div className="p-5 bg-red-50 dark:bg-red-900/20 rounded-xl border-2 border-red-200 dark:border-red-800">
                     <h3 className="font-bold text-red-700 dark:text-red-400 mb-3 flex items-center gap-2 text-lg">
                       <XCircle className="w-5 h-5" />
                       틀린 문제 ({wrongQuestions.length}개)
                     </h3>
-                    <div className="space-y-2">
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
                       {result.details
                         .filter(d => !d.isCorrect && d.studentAnswer)
                         .map(d => (
-                          <div key={d.questionNumber} className="p-3 bg-background/50 rounded-lg border border-red-300 dark:border-red-800">
+                          <div key={d.questionNumber} className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-red-200 dark:border-red-800">
                             <div className="flex items-center justify-between mb-2">
                               <span className="font-bold text-base">{d.questionNumber}번</span>
                               {d.isMultipleAnswer && (
@@ -458,7 +541,7 @@ export default function ResultPage() {
                 )}
 
                 {unansweredList.length > 0 && (
-                  <div className="p-6 bg-gray-500/10 dark:bg-gray-500/20 rounded-xl border-2 border-gray-500/30">
+                  <div className="p-5 bg-gray-50 dark:bg-gray-900/50 rounded-xl border-2 border-gray-200 dark:border-gray-700">
                     <h3 className="font-bold text-gray-700 dark:text-gray-400 mb-3 flex items-center gap-2 text-lg">
                       <FileText className="w-5 h-5" />
                       시험범위 외 문제 ({unansweredList.length}개)
@@ -478,10 +561,14 @@ export default function ResultPage() {
 
           {/* Main Content Tabs */}
           <Tabs defaultValue="student" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 h-14">
+            <TabsList className="grid w-full grid-cols-3 h-14">
               <TabsTrigger value="student" data-testid="tab-student-feedback" className="text-lg">
                 <User className="w-5 h-5 mr-2" />
                 학생용 분석
+              </TabsTrigger>
+              <TabsTrigger value="exam-analysis" data-testid="tab-exam-analysis" className="text-lg">
+                <PieChartIcon className="w-5 h-5 mr-2" />
+                출제 분석
               </TabsTrigger>
               <TabsTrigger value="teacher" data-testid="tab-teacher-feedback" className="text-lg">
                 <GraduationCap className="w-5 h-5 mr-2" />
@@ -492,18 +579,20 @@ export default function ResultPage() {
             {/* 학생용 탭 */}
             <TabsContent value="student" className="space-y-6 mt-6">
               {/* 종합 피드백 */}
-              <Card className="border-2">
-                <CardHeader className="space-y-2">
-                  <CardTitle className="flex items-center gap-2 text-2xl">
-                    <Brain className="w-7 h-7 text-primary" />
+              <Card className="border-2 overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 border-b">
+                  <CardTitle className="flex items-center gap-3 text-xl">
+                    <div className="p-2 bg-blue-500 rounded-lg">
+                      <Brain className="w-5 h-5 text-white" />
+                    </div>
                     종합 평가
                   </CardTitle>
                   <CardDescription className="text-base">
                     당신의 시험 결과에 대한 상세 분석입니다
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="p-6 bg-primary/10 dark:bg-primary/20 rounded-xl border-2 border-primary/30">
+                <CardContent className="p-6 space-y-6">
+                  <div className="p-5 bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl border border-primary/20">
                     <p className="text-xl font-semibold mb-3">{studentFeedback.mainMessage}</p>
                     <p className="text-lg text-muted-foreground">{studentFeedback.encouragement}</p>
                   </div>
@@ -515,7 +604,7 @@ export default function ResultPage() {
                     </h4>
                     <div className="grid gap-3">
                       {studentFeedback.specificAdvice.map((tip, i) => (
-                        <div key={i} className="flex items-start gap-3 p-4 bg-card/50 rounded-lg border hover-elevate">
+                        <div key={i} className="flex items-start gap-3 p-4 bg-card/50 rounded-lg border hover:shadow-md transition-shadow">
                           <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold">
                             {i + 1}
                           </div>
@@ -525,9 +614,8 @@ export default function ResultPage() {
                     </div>
                   </div>
 
-                  {/* 단원별 성취도 요약 */}
                   {studentFeedback.strongUnits.length > 0 && (
-                    <div className="p-5 bg-green-500/10 dark:bg-green-500/20 rounded-xl border border-green-500/30">
+                    <div className="p-5 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 rounded-xl border border-green-200 dark:border-green-900">
                       <h4 className="font-bold text-green-700 dark:text-green-400 mb-3 flex items-center gap-2">
                         <Star className="w-5 h-5" />
                         우수한 단원 ({studentFeedback.strongUnits.length}개)
@@ -546,7 +634,7 @@ export default function ResultPage() {
                   )}
 
                   {studentFeedback.weakUnits.length > 0 && (
-                    <div className="p-5 bg-orange-500/10 dark:bg-orange-500/20 rounded-xl border border-orange-500/30">
+                    <div className="p-5 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/20 dark:to-red-950/20 rounded-xl border border-orange-200 dark:border-orange-900">
                       <h4 className="font-bold text-orange-700 dark:text-orange-400 mb-3 flex items-center gap-2">
                         <BookOpen className="w-5 h-5" />
                         복습이 필요한 단원 ({studentFeedback.weakUnits.length}개)
@@ -566,84 +654,115 @@ export default function ResultPage() {
                 </CardContent>
               </Card>
 
-              {/* 단원별 성취도 비교 차트 */}
-              <Card className="border-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-2xl">
-                    <BarChart3 className="w-7 h-7 text-primary" />
-                    단원별 성취도 비교
+              {/* 단원별 출제 분포 - 새로운 스타일 */}
+              <Card className="border-2 overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 border-b">
+                  <CardTitle className="flex items-center gap-3 text-xl">
+                    <div className="p-2 bg-blue-500 rounded-lg">
+                      <BookOpen className="w-5 h-5 text-white" />
+                    </div>
+                    단원별 출제 분포
                   </CardTitle>
-                  <CardDescription>
-                    내 성적과 전체 평균, 최고 성적을 비교해보세요
-                  </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="h-96">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
-                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                        <XAxis 
-                          dataKey="name" 
-                          angle={-45} 
-                          textAnchor="end" 
-                          height={100}
-                          tick={{ fontSize: 12 }}
-                        />
-                        <YAxis domain={[0, 100]} />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'var(--background)', 
-                            border: '1px solid var(--border)',
-                            borderRadius: '8px'
-                          }}
-                          labelFormatter={(label, payload) => {
-                            if (payload && payload[0]) {
-                              return payload[0].payload.fullName;
-                            }
-                            return label;
-                          }}
-                        />
-                        <Legend />
-                        <Bar dataKey="나의성적" fill="#10b981" name="나의 성적" radius={[8, 8, 0, 0]} />
-                        <Bar dataKey="평균" fill="#3b82f6" name="전체 평균" radius={[8, 8, 0, 0]} />
-                        <Bar dataKey="최고점" fill="#f59e0b" name="최고 점수" radius={[8, 8, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                <CardContent className="p-6">
+                  <div className="mb-6">
+                    <h4 className="text-sm font-semibold text-muted-foreground mb-4">단원별 문항 수 및 비중</h4>
+                    {unitDistribution.length > 0 ? (
+                      <div className="h-72">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={unitDistribution} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                            <XAxis
+                              dataKey="name"
+                              angle={-35}
+                              textAnchor="end"
+                              height={80}
+                              tick={{ fontSize: 11 }}
+                              interval={0}
+                            />
+                            <YAxis />
+                            <Tooltip
+                              content={({ active, payload }) => {
+                                if (active && payload && payload.length) {
+                                  const data = payload[0].payload;
+                                  return (
+                                    <div className="bg-background border rounded-lg shadow-lg p-3">
+                                      <p className="font-semibold text-sm">{data.fullName}</p>
+                                      <p className="text-sm text-muted-foreground">{data.문항수}문항 ({data.비중}%)</p>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              }}
+                            />
+                            <Bar dataKey="문항수" radius={[8, 8, 0, 0]}>
+                              {unitDistribution.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <p className="text-center text-muted-foreground py-20">데이터가 없습니다</p>
+                    )}
                   </div>
+
+                  {/* 출제 경향 분석 */}
+                  {unitDistribution.length > 0 && (
+                    <div className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20 rounded-xl p-5 border border-yellow-200 dark:border-yellow-900">
+                      <h4 className="font-bold text-yellow-700 dark:text-yellow-400 mb-3 flex items-center gap-2">
+                        <span className="text-lg">⭐</span> 출제 경향 분석
+                      </h4>
+                      <ul className="space-y-2 text-sm">
+                        {unitDistribution.slice(0, 3).map((unit, i) => (
+                          <li key={i} className="flex items-start gap-2">
+                            <span className="text-yellow-600">•</span>
+                            <span>
+                              <strong className="text-yellow-700 dark:text-yellow-400">{unit.fullName}</strong>
+                              {i === 0 ? '이' : '와'} 전체의 {unit.비중}%로 {i === 0 ? '가장 많이' : ''} 출제 ({unit.문항수}문항)
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
-              {/* 레이더 차트 */}
-              <Card className="border-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-2xl">
-                    <Target className="w-7 h-7 text-primary" />
+              {/* 레이더 차트 - 새로운 스타일 */}
+              <Card className="border-2 overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-cyan-50 to-blue-50 dark:from-cyan-950/30 dark:to-blue-950/30 border-b">
+                  <CardTitle className="flex items-center gap-3 text-xl">
+                    <div className="p-2 bg-cyan-500 rounded-lg">
+                      <Target className="w-5 h-5 text-white" />
+                    </div>
                     영역별 밸런스 분석
                   </CardTitle>
                   <CardDescription>
                     각 단원의 균형 잡힌 학습 정도를 시각화했습니다
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="h-96">
+                <CardContent className="p-6">
+                  <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="70%">
                         <PolarGrid stroke="var(--border)" />
-                        <PolarAngleAxis 
-                          dataKey="unit" 
+                        <PolarAngleAxis
+                          dataKey="unit"
                           tick={{ fontSize: 10, fill: 'var(--foreground)' }}
                         />
                         <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10 }} />
-                        <Radar 
-                          name="나의 성취도" 
-                          dataKey="value" 
-                          stroke="#10b981" 
-                          fill="#10b981" 
-                          fillOpacity={0.6} 
+                        <Radar
+                          name="나의 성취도"
+                          dataKey="value"
+                          stroke="#10b981"
+                          fill="#10b981"
+                          fillOpacity={0.5}
                         />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'var(--background)', 
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'var(--background)',
                             border: '1px solid var(--border)',
                             borderRadius: '8px'
                           }}
@@ -660,46 +779,41 @@ export default function ResultPage() {
                 </CardContent>
               </Card>
 
-              {/* 단원별 상세 정보 with 통계 */}
-              <Card className="border-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-2xl">
-                    <TrendingUp className="w-7 h-7 text-primary" />
+              {/* 단원별 상세 분석 - 새로운 스타일 */}
+              <Card className="border-2 overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 border-b">
+                  <CardTitle className="flex items-center gap-3 text-xl">
+                    <div className="p-2 bg-indigo-500 rounded-lg">
+                      <TrendingUp className="w-5 h-5 text-white" />
+                    </div>
                     단원별 상세 분석
                   </CardTitle>
                   <CardDescription>
                     각 단원의 세부 성적과 전체 통계를 확인하세요
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-6">
                   <div className="space-y-4">
                     {answeredUnitResults.map((unit, i) => {
                       const stats = unitStats?.find(s => s.unit === unit.unit);
                       const myScore = unit.achievementRate;
                       const avgScore = stats?.average || 0;
                       const highScore = stats?.highest || 0;
-                      
+
                       const isAboveAvg = myScore >= avgScore;
-                      const isTopScore = myScore === highScore && myScore === 100;
+                      const gradeInfo = getGrade(myScore);
 
                       return (
-                        <div key={i} className="p-5 rounded-xl border-2 hover-elevate bg-card/50">
+                        <div key={i} className="p-5 rounded-xl border-2 bg-white dark:bg-gray-900 shadow-sm hover:shadow-md transition-shadow">
                           <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-3">
                               <Badge variant="outline" className="text-base px-3 py-1">
                                 {unit.category}
                               </Badge>
                               <span className="font-bold text-lg">{unit.unit}</span>
-                              {isTopScore && (
-                                <Badge className="bg-yellow-500 hover:bg-yellow-600">
-                                  <Trophy className="w-3 h-3 mr-1" />
-                                  최고점
-                                </Badge>
-                              )}
                             </div>
-                            <Badge 
-                              variant={unit.achievementRate >= 70 ? "default" : "destructive"}
-                              className="text-lg px-4 py-2 font-mono"
+                            <Badge
+                              className={`text-lg px-4 py-2 font-mono ${gradeInfo.bgColor} ${gradeInfo.color} border ${gradeInfo.borderColor}`}
                             >
                               {unit.achievementRate}%
                             </Badge>
@@ -707,7 +821,7 @@ export default function ResultPage() {
 
                           {/* 성적 비교 */}
                           {stats && (
-                            <div className="mb-4 p-4 bg-muted/50 rounded-lg">
+                            <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
                               <div className="grid grid-cols-3 gap-4 text-sm">
                                 <div className="text-center">
                                   <div className="text-xs text-muted-foreground mb-1">나의 성적</div>
@@ -729,8 +843,8 @@ export default function ResultPage() {
                                 </div>
                               </div>
                               <div className="mt-3 text-xs text-center text-muted-foreground">
-                                {isAboveAvg 
-                                  ? "평균보다 높은 성적이에요!" 
+                                {isAboveAvg
+                                  ? "평균보다 높은 성적이에요!"
                                   : "평균보다 조금 더 노력이 필요해요!"}
                               </div>
                             </div>
@@ -742,11 +856,11 @@ export default function ResultPage() {
                               <div className="font-bold text-lg">{unit.total}</div>
                               <div className="text-xs text-muted-foreground">총 문항</div>
                             </div>
-                            <div className="text-center p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                            <div className="text-center p-3 bg-green-100 dark:bg-green-900/30 rounded-lg border border-green-200 dark:border-green-800">
                               <div className="font-bold text-lg text-green-700 dark:text-green-400">{unit.correct}</div>
                               <div className="text-xs text-muted-foreground">정답</div>
                             </div>
-                            <div className="text-center p-3 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                            <div className="text-center p-3 bg-red-100 dark:bg-red-900/30 rounded-lg border border-red-200 dark:border-red-800">
                               <div className="font-bold text-lg text-red-700 dark:text-red-400">{unit.wrong}</div>
                               <div className="text-xs text-muted-foreground">오답</div>
                             </div>
@@ -765,23 +879,33 @@ export default function ResultPage() {
               </Card>
             </TabsContent>
 
+            {/* 출제 분석 탭 */}
+            <TabsContent value="exam-analysis" className="space-y-6 mt-6">
+              <ExamAnalysis
+                unitResults={result.unitResults}
+                details={result.details || []}
+                totalQuestions={result.totalQuestions}
+                correctAnswers={result.correctAnswers}
+              />
+            </TabsContent>
+
             {/* 선생님용 탭 */}
             <TabsContent value="teacher" className="space-y-6 mt-6">
               {/* 종합 지도안 */}
               {teacherGuidance.map((guide, i) => (
-                <Card key={i} className="border-2">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-3 text-2xl">
-                      <guide.icon className="w-7 h-7" />
+                <Card key={i} className="border-2 overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-900/50 dark:to-slate-900/50 border-b">
+                    <CardTitle className="flex items-center gap-3 text-xl">
+                      <guide.icon className="w-6 h-6" />
                       {guide.title}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="p-6 space-y-4">
                     <div className="p-5 bg-muted/50 rounded-xl">
                       <p className="text-lg mb-2 font-medium">관찰 내용</p>
                       <p className="text-base text-muted-foreground">{guide.content}</p>
                     </div>
-                    <div className="p-5 bg-primary/10 dark:bg-primary/20 rounded-xl border-2 border-primary/30">
+                    <div className="p-5 bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl border border-primary/20">
                       <p className="text-lg mb-2 font-medium flex items-center gap-2">
                         <ChevronRight className="w-5 h-5 text-primary" />
                         추천 지도 방안
@@ -793,17 +917,19 @@ export default function ResultPage() {
               ))}
 
               {/* 단원별 상세 지도 가이드 */}
-              <Card className="border-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-2xl">
-                    <BookOpen className="w-7 h-7 text-primary" />
+              <Card className="border-2 overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-b">
+                  <CardTitle className="flex items-center gap-3 text-xl">
+                    <div className="p-2 bg-green-500 rounded-lg">
+                      <BookOpen className="w-5 h-5 text-white" />
+                    </div>
                     단원별 지도 가이드
                   </CardTitle>
                   <CardDescription>
                     각 단원에 대한 맞춤형 교육 방안
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-6">
                   <div className="space-y-5">
                     {answeredUnitResults.map((unit, i) => {
                       const stats = unitStats?.find(s => s.unit === unit.unit);
@@ -841,13 +967,13 @@ export default function ResultPage() {
                       }
 
                       return (
-                        <div 
-                          key={i} 
+                        <div
+                          key={i}
                           className={`p-5 rounded-xl border-2 ${
-                            unit.achievementRate >= 90 ? 'bg-green-500/10 border-green-500/30' :
-                            unit.achievementRate >= 70 ? 'bg-blue-500/10 border-blue-500/30' :
-                            unit.achievementRate >= 50 ? 'bg-orange-500/10 border-orange-500/30' :
-                            'bg-red-500/10 border-red-500/30'
+                            unit.achievementRate >= 90 ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 border-green-200 dark:border-green-800' :
+                            unit.achievementRate >= 70 ? 'bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 border-blue-200 dark:border-blue-800' :
+                            unit.achievementRate >= 50 ? 'bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 border-orange-200 dark:border-orange-800' :
+                            'bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-950/20 dark:to-pink-950/20 border-red-200 dark:border-red-800'
                           }`}
                         >
                           <div className="flex items-center justify-between mb-4">

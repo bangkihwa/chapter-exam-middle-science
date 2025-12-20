@@ -223,10 +223,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { studentId } = req.params;
       const submissions = await storage.getSubmissionsByStudent(studentId);
-      
+
+      // 중등 통합과학 선행 시험(examId=1)만 필터링
+      const allExams = await storage.getAllExams();
+      const runjiExam = allExams.find(e => e.subject === '중등 통합과학 선행');
+      const runjiExamId = runjiExam?.id || 1;
+
+      const filteredSubmissions = submissions.filter(s => s.examId === runjiExamId);
+
       // Enhance with exam details
       const enrichedSubmissions = await Promise.all(
-        submissions.map(async (submission) => {
+        filteredSubmissions.map(async (submission) => {
           const exam = await storage.getExamById(submission.examId);
           return {
             ...submission,
@@ -235,7 +242,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         })
       );
-      
+
       return res.json(enrichedSubmissions);
     } catch (error: any) {
       return res.status(500).json({
