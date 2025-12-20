@@ -7,13 +7,23 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ShieldCheck, Users, BarChart3, AlertCircle, TrendingDown, LogOut, Search, Calendar, RefreshCw, Settings2, Link as LinkIcon, Database } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ShieldCheck, Users, BarChart3, AlertCircle, TrendingDown, LogOut, Search, Calendar, RefreshCw, Settings2, Link as LinkIcon, Database, UserPlus, X, Pencil, Trash2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import type { Student, TestResult } from "@shared/schema";
 import { units } from "@shared/schema";
 import { StudentReportView } from "@/components/student-report-view";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+
+const GRADE_OPTIONS = [
+  "중등 1학년",
+  "중등 2학년",
+  "중등 3학년",
+  "고등 1학년",
+  "고등 2학년",
+  "고등 3학년",
+];
 
 interface SheetResult {
   studentId: string;
@@ -54,6 +64,10 @@ export default function AdminPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [spreadsheetIdInput, setSpreadsheetIdInput] = useState("");
+  const [showAddStudent, setShowAddStudent] = useState(false);
+  const [showEditStudent, setShowEditStudent] = useState(false);
+  const [newStudent, setNewStudent] = useState({ studentId: "", studentName: "", grade: "", phone: "" });
+  const [editStudent, setEditStudent] = useState<{ studentId: string; studentName: string; grade: string; phone: string } | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -160,6 +174,85 @@ export default function AdminPage() {
     },
   });
 
+  const addStudentMutation = useMutation({
+    mutationFn: async (data: { studentId: string; studentName: string; grade: string; phone: string }) => {
+      return await apiRequest<{ success: boolean; message: string; student: any }>(
+        "POST",
+        "/api/admin/students",
+        data
+      );
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/students"] });
+      toast({
+        title: "학생 추가 완료",
+        description: data.message,
+        variant: "default",
+      });
+      setNewStudent({ studentId: "", studentName: "", grade: "", phone: "" });
+      setShowAddStudent(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "학생 추가 실패",
+        description: error.message || "학생을 추가하는 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateStudentMutation = useMutation({
+    mutationFn: async (data: { studentId: string; studentName: string; grade: string; phone: string }) => {
+      return await apiRequest<{ success: boolean; message: string; student: any }>(
+        "PUT",
+        `/api/admin/students/${data.studentId}`,
+        data
+      );
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/students"] });
+      toast({
+        title: "수정 완료",
+        description: data.message,
+        variant: "default",
+      });
+      setEditStudent(null);
+      setShowEditStudent(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "수정 실패",
+        description: error.message || "학생 정보를 수정하는 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteStudentMutation = useMutation({
+    mutationFn: async (studentId: string) => {
+      return await apiRequest<{ success: boolean; message: string }>(
+        "DELETE",
+        `/api/admin/students/${studentId}`,
+        {}
+      );
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/students"] });
+      toast({
+        title: "삭제 완료",
+        description: data.message,
+        variant: "default",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "삭제 실패",
+        description: error.message || "학생을 삭제하는 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleLogout = () => {
     sessionStorage.removeItem("admin");
     setLocation("/admin/login");
@@ -171,6 +264,47 @@ export default function AdminPage() {
 
   const handleInitData = () => {
     initDataMutation.mutate();
+  };
+
+  const handleAddStudent = () => {
+    if (!newStudent.studentId.trim() || !newStudent.studentName.trim()) {
+      toast({
+        title: "입력 오류",
+        description: "학생 ID와 이름은 필수입니다.",
+        variant: "destructive",
+      });
+      return;
+    }
+    addStudentMutation.mutate(newStudent);
+  };
+
+  const handleEditStudent = (student: Student) => {
+    setEditStudent({
+      studentId: student.studentId,
+      studentName: student.studentName,
+      grade: student.grade || "",
+      phone: student.phone || "",
+    });
+    setShowEditStudent(true);
+  };
+
+  const handleUpdateStudent = () => {
+    if (!editStudent) return;
+    if (!editStudent.studentName.trim()) {
+      toast({
+        title: "입력 오류",
+        description: "이름은 필수입니다.",
+        variant: "destructive",
+      });
+      return;
+    }
+    updateStudentMutation.mutate(editStudent);
+  };
+
+  const handleDeleteStudent = (studentId: string, studentName: string) => {
+    if (confirm(`정말 "${studentName}" 학생을 삭제하시겠습니까?`)) {
+      deleteStudentMutation.mutate(studentId);
+    }
   };
 
   const handleSaveSpreadsheetId = () => {
@@ -249,12 +383,19 @@ export default function AdminPage() {
             <div className="flex items-center gap-2">
               <Button
                 variant="default"
+                onClick={() => setShowAddStudent(true)}
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                학생 추가
+              </Button>
+              <Button
+                variant="outline"
                 onClick={handleSyncStudents}
                 disabled={syncStudentsMutation.isPending}
                 data-testid="button-sync-students"
               >
                 <RefreshCw className={`w-4 h-4 mr-2 ${syncStudentsMutation.isPending ? 'animate-spin' : ''}`} />
-                {syncStudentsMutation.isPending ? "동기화 중..." : "학생 동기화"}
+                {syncStudentsMutation.isPending ? "동기화 중..." : "동기화"}
               </Button>
               <Button
                 variant="outline"
@@ -268,6 +409,139 @@ export default function AdminPage() {
           </div>
         </div>
       </header>
+
+      {/* 학생 추가 모달 */}
+      {showAddStudent && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>새 학생 추가</CardTitle>
+              <Button variant="ghost" size="icon" onClick={() => setShowAddStudent(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">학생 ID *</label>
+                <Input
+                  placeholder="예: h01065"
+                  value={newStudent.studentId}
+                  onChange={(e) => setNewStudent({ ...newStudent, studentId: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">이름 *</label>
+                <Input
+                  placeholder="예: 홍길동"
+                  value={newStudent.studentName}
+                  onChange={(e) => setNewStudent({ ...newStudent, studentName: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">학년</label>
+                <Select value={newStudent.grade} onValueChange={(value) => setNewStudent({ ...newStudent, grade: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="학년 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GRADE_OPTIONS.map((grade) => (
+                      <SelectItem key={grade} value={grade}>{grade}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">전화번호</label>
+                <Input
+                  placeholder="예: 01012345678"
+                  value={newStudent.phone}
+                  onChange={(e) => setNewStudent({ ...newStudent, phone: e.target.value })}
+                />
+              </div>
+              <div className="flex gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowAddStudent(false)}
+                >
+                  취소
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={handleAddStudent}
+                  disabled={addStudentMutation.isPending}
+                >
+                  {addStudentMutation.isPending ? "추가 중..." : "추가"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* 학생 수정 모달 */}
+      {showEditStudent && editStudent && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>학생 정보 수정</CardTitle>
+              <Button variant="ghost" size="icon" onClick={() => { setShowEditStudent(false); setEditStudent(null); }}>
+                <X className="w-4 h-4" />
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">학생 ID</label>
+                <Input value={editStudent.studentId} disabled className="bg-muted" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">이름 *</label>
+                <Input
+                  value={editStudent.studentName}
+                  onChange={(e) => setEditStudent({ ...editStudent, studentName: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">학년</label>
+                <Select value={editStudent.grade} onValueChange={(value) => setEditStudent({ ...editStudent, grade: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="학년 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GRADE_OPTIONS.map((grade) => (
+                      <SelectItem key={grade} value={grade}>{grade}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">전화번호</label>
+                <Input
+                  placeholder="예: 01012345678"
+                  value={editStudent.phone}
+                  onChange={(e) => setEditStudent({ ...editStudent, phone: e.target.value })}
+                />
+              </div>
+              <div className="flex gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => { setShowEditStudent(false); setEditStudent(null); }}
+                >
+                  취소
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={handleUpdateStudent}
+                  disabled={updateStudentMutation.isPending}
+                >
+                  {updateStudentMutation.isPending ? "저장 중..." : "저장"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <main className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="space-y-8">
@@ -451,38 +725,56 @@ export default function AdminPage() {
                                          student.averageScore >= 60 ? "bg-orange-500/10" : "bg-red-500/10";
 
                           return (
-                            <Button
-                              key={student.studentId}
-                              variant="outline"
-                              className="w-full justify-start p-4 h-auto hover-elevate"
-                              onClick={() => setSelectedStudent(student)}
-                            >
-                              <div className="flex items-center gap-4 w-full">
-                                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 font-bold text-primary flex-shrink-0">
-                                  {index + 1}
+                            <div key={student.studentId} className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                className="flex-1 justify-start p-4 h-auto hover-elevate"
+                                onClick={() => setSelectedStudent(student)}
+                              >
+                                <div className="flex items-center gap-4 w-full">
+                                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 font-bold text-primary flex-shrink-0">
+                                    {index + 1}
+                                  </div>
+                                  <div className="flex-1 grid md:grid-cols-4 gap-4 text-left">
+                                    <div>
+                                      <p className="text-sm text-muted-foreground">이름</p>
+                                      <p className="font-semibold">{student.studentName}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-sm text-muted-foreground">학생 ID</p>
+                                      <p className="font-mono text-sm">{student.studentId}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-sm text-muted-foreground">응시 횟수</p>
+                                      <p className="font-semibold">{student.totalTests}회</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-sm text-muted-foreground">평균 성취율</p>
+                                      <Badge className={`${gradeBg} ${gradeColor} font-mono text-base`}>
+                                        {student.averageScore}%
+                                      </Badge>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="flex-1 grid md:grid-cols-4 gap-4 text-left">
-                                  <div>
-                                    <p className="text-sm text-muted-foreground">이름</p>
-                                    <p className="font-semibold">{student.studentName}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm text-muted-foreground">학생 ID</p>
-                                    <p className="font-mono text-sm">{student.studentId}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm text-muted-foreground">응시 횟수</p>
-                                    <p className="font-semibold">{student.totalTests}회</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm text-muted-foreground">평균 성취율</p>
-                                    <Badge className={`${gradeBg} ${gradeColor} font-mono text-base`}>
-                                      {student.averageScore}%
-                                    </Badge>
-                                  </div>
-                                </div>
-                              </div>
-                            </Button>
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEditStudent(student)}
+                                title="수정"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteStudent(student.studentId, student.studentName)}
+                                title="삭제"
+                                className="text-red-500 hover:text-red-700"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           );
                         })
                       )}

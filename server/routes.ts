@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { loginSchema, submitTestSchema, submitUnitTestSchema, type UnitResult, submissions, students } from "@shared/schema";
-import { readExamDataFromSheet, writeExamDataToSheet, writeStudentResultToSheet, readResultsFromSheet, readAllResultsFromSheet } from "./googleSheets";
+import { readExamDataFromSheet, writeExamDataToSheet, writeStudentResultToSheet, readResultsFromSheet, readAllResultsFromSheet, readStudentsFromSheet } from "./googleSheets";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 
@@ -941,12 +941,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 학생 추가 API
+  app.post("/api/admin/students", async (req, res) => {
+    try {
+      const { studentId, studentName, grade, phone } = req.body;
+
+      if (!studentId || !studentName) {
+        return res.status(400).json({
+          message: "학생 ID와 이름은 필수입니다.",
+        });
+      }
+
+      // 중복 체크
+      const existing = await storage.getStudentById(studentId);
+      if (existing) {
+        return res.status(400).json({
+          message: "이미 존재하는 학생 ID입니다.",
+        });
+      }
+
+      const student = await storage.createStudent({
+        studentId,
+        studentName,
+        grade: grade || null,
+        phone: phone || null,
+      });
+
+      return res.json({
+        success: true,
+        message: "학생이 추가되었습니다.",
+        student,
+      });
+    } catch (error: any) {
+      console.error('Add student error:', error);
+      return res.status(500).json({
+        message: error.message || "학생 추가 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
+  // 학생 수정 API
+  app.put("/api/admin/students/:studentId", async (req, res) => {
+    try {
+      const { studentId } = req.params;
+      const { studentName, grade, phone } = req.body;
+
+      const existing = await storage.getStudentById(studentId);
+      if (!existing) {
+        return res.status(404).json({
+          message: "학생을 찾을 수 없습니다.",
+        });
+      }
+
+      const updated = await db
+        .update(students)
+        .set({
+          studentName: studentName || existing.studentName,
+          grade: grade !== undefined ? grade : existing.grade,
+          phone: phone !== undefined ? phone : existing.phone,
+        })
+        .where(eq(students.studentId, studentId))
+        .returning();
+
+      return res.json({
+        success: true,
+        message: "학생 정보가 수정되었습니다.",
+        student: updated[0],
+      });
+    } catch (error: any) {
+      console.error('Update student error:', error);
+      return res.status(500).json({
+        message: error.message || "학생 수정 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
+  // 학생 삭제 API
+  app.delete("/api/admin/students/:studentId", async (req, res) => {
+    try {
+      const { studentId } = req.params;
+
+      const existing = await storage.getStudentById(studentId);
+      if (!existing) {
+        return res.status(404).json({
+          message: "학생을 찾을 수 없습니다.",
+        });
+      }
+
+      await db.delete(students).where(eq(students.studentId, studentId));
+
+      return res.json({
+        success: true,
+        message: "학생이 삭제되었습니다.",
+      });
+    } catch (error: any) {
+      console.error('Delete student error:', error);
+      return res.status(500).json({
+        message: error.message || "학생 삭제 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
   app.get("/api/admin/submissions", async (req, res) => {
     try {
       const submissions = await storage.getAllSubmissions();
-      
+
+      // 중등 통합과학 선행 시험만 필터링
+      const allExams = await storage.getAllExams();
+      const seonhaengExam = allExams.find(e => e.subject === '중등 통합과학 선행');
+      const seonhaengExamId = seonhaengExam?.id;
+
+      const filteredSubmissions = seonhaengExamId
+        ? submissions.filter(s => s.examId === seonhaengExamId)
+        : submissions;
+
       const enrichedSubmissions = await Promise.all(
-        submissions.map(async (submission) => {
+        filteredSubmissions.map(async (submission) => {
           const exam = await storage.getExamById(submission.examId);
           return {
             ...submission,
@@ -955,7 +1065,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         })
       );
-      
+
       return res.json(enrichedSubmissions);
     } catch (error: any) {
       return res.status(500).json({
@@ -1045,6 +1155,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log(`[Admin] Reading all results from Supabase...`);
 
+      // 중등 통합과학 선행 시험 ID 찾기
+      const allExams = await storage.getAllExams();
+      const seonhaengExam = allExams.find(e => e.subject === '중등 통합과학 선행');
+      const seonhaengExamId = seonhaengExam?.id;
+
       // Get all submissions with student info and unit results
       const allSubmissions = await db
         .select({
@@ -1061,12 +1176,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .leftJoin(students, eq(submissions.studentId, students.studentId))
         .orderBy(desc(submissions.submittedAt));
 
-      console.log(`[Admin] Found ${allSubmissions.length} submissions in database`);
+      // 중등 통합과학 선행 시험만 필터링
+      const filteredSubmissions = seonhaengExamId
+        ? allSubmissions.filter(s => s.examId === seonhaengExamId)
+        : allSubmissions;
+
+      console.log(`[Admin] Found ${filteredSubmissions.length} submissions (filtered from ${allSubmissions.length})`);
 
       // Flatten unit results for display
       const formattedResults: any[] = [];
 
-      for (const submission of allSubmissions) {
+      for (const submission of filteredSubmissions) {
         // Parse unitResults if it's a string
         let unitResultsArray = submission.unitResults;
         if (typeof unitResultsArray === 'string') {
@@ -1135,6 +1255,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       return res.status(500).json({
         message: error.message || "설정 저장 중 오류가 발생했습니다.",
+      });
+    }
+  });
+
+  // Sync students - refresh student and submission data from Supabase
+  app.post("/api/sync-students", async (req, res) => {
+    try {
+      console.log(`[Sync] Refreshing student and submission data from Supabase...`);
+
+      // Get all students from Supabase
+      const allStudents = await storage.getAllStudents();
+
+      // Get all submissions from Supabase
+      const allSubmissions = await storage.getAllSubmissions();
+
+      // Get exams to filter by "중등 통합과학 선행"
+      const allExams = await storage.getAllExams();
+      const seonhaengExam = allExams.find(e => e.subject === '중등 통합과학 선행');
+
+      // Count submissions for 중등 통합과학 선행
+      const seonhaengSubmissions = seonhaengExam
+        ? allSubmissions.filter(s => s.examId === seonhaengExam.id)
+        : [];
+
+      console.log(`[Sync] Found ${allStudents.length} students, ${allSubmissions.length} total submissions, ${seonhaengSubmissions.length} 선행 submissions`);
+
+      return res.json({
+        message: `동기화 완료: 학생 ${allStudents.length}명, 선행시험 응시 ${seonhaengSubmissions.length}건`,
+        added: seonhaengSubmissions.length,
+        skipped: 0,
+        total: allStudents.length,
+      });
+    } catch (error: any) {
+      console.error('Sync students error:', error);
+      return res.status(500).json({
+        message: error.message || "학생 동기화 중 오류가 발생했습니다.",
       });
     }
   });
